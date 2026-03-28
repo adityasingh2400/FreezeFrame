@@ -4,9 +4,12 @@ scene/raw_videos/*.mov
 scene/raw_videos/*.MOV
 scene/synced_videos/*.mp4
 scene/images/cam*/*.png
-scene/sparse/0/*.bin
-scene/poses_bounds.npy
-scene/metadata.json
+scene/images/cam*/*.jpg
+
+# Contract B outputs — tracked so Aditya can pull them directly
+# scene/sparse/0/*.bin
+# scene/poses_bounds.npy
+# scene/metadata.json
 
 # Training output
 output/checkpoints/
