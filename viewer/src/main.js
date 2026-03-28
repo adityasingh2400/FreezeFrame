@@ -61,8 +61,102 @@ function showAgentView(files) {
     }
   }
 
+  // Add sync timeline bar to each thumb
+  const clapPcts = [0.31, 0.38, 0.27, 0.34, 0.29]; // each camera's clap position
+  for (let i = 0; i < 5; i++) {
+    const thumb = document.getElementById(`thumb-${i}`);
+    const timeline = document.createElement('div');
+    timeline.className = 'thumb-timeline';
+    const fill = document.createElement('div');
+    fill.className = 'thumb-timeline-fill';
+    const marker = document.createElement('div');
+    marker.className = 'thumb-clap-marker';
+    marker.style.left = (clapPcts[i] * 100) + '%';
+    timeline.appendChild(fill);
+    timeline.appendChild(marker);
+    thumb.appendChild(timeline);
+  }
+
+  // Add sync label under agent circle
+  const syncLabel = document.createElement('div');
+  syncLabel.id = 'sync-label';
+  syncLabel.textContent = '● FRAMES SYNCED';
+  agentCircle.style.position = 'relative';
+  agentCircle.appendChild(syncLabel);
+
+  // Run sync animation after thumbs appear
+  setTimeout(() => playSyncAnimation(count, clapPcts), 1200);
+
   // Tap agent circle to trigger merge (placeholder — Phase 3 will use voice)
   agentCircle.addEventListener('click', triggerMerge, { once: true });
+}
+
+// ── Sync Animation ────────────────────────────────────────────────────
+
+function playSyncAnimation(count, clapPcts) {
+  const thumbs = Array.from({ length: count }, (_, i) => document.getElementById(`thumb-${i}`));
+
+  // Phase 1: timelines appear and scrub independently to their clap frame
+  thumbs.forEach((thumb, i) => {
+    setTimeout(() => {
+      thumb.classList.add('syncing');
+      const fill = thumb.querySelector('.thumb-timeline-fill');
+      if (fill) fill.style.width = (clapPcts[i] * 100) + '%';
+    }, i * 90);
+  });
+
+  // Phase 2: all rush toward center (clap convergence)
+  setTimeout(() => {
+    thumbs.forEach(thumb => thumb.classList.add('clap-converge'));
+  }, 900);
+
+  // Phase 2b: CLAP — impact at center, flash, shockwave
+  setTimeout(() => {
+    // Hard snap
+    thumbs.forEach(thumb => {
+      const fill = thumb.querySelector('.thumb-timeline-fill');
+      if (fill) fill.style.transition = 'none';
+      thumb.classList.add('synced');
+    });
+
+    // Screen flash
+    const flash = document.getElementById('clap-flash');
+    if (flash) {
+      flash.style.opacity = '1';
+      setTimeout(() => { flash.style.opacity = '0'; }, 90);
+    }
+
+    // Shockwave ring
+    const ring = document.getElementById('clap-ring');
+    if (ring) ring.classList.add('active');
+
+    // Spring back to orbit positions
+    thumbs.forEach(thumb => {
+      thumb.classList.remove('clap-converge');
+      thumb.classList.add('clap-rebound');
+      setTimeout(() => thumb.classList.remove('clap-rebound'), 500);
+    });
+
+    const syncLabel = document.getElementById('sync-label');
+    if (syncLabel) syncLabel.classList.add('visible');
+    const hint = document.getElementById('agent-hint');
+    if (hint) hint.textContent = 'tap to build';
+  }, 1150);
+
+  // Phase 3: clean up
+  setTimeout(() => {
+    thumbs.forEach(thumb => {
+      const tl = thumb.querySelector('.thumb-timeline');
+      if (tl) tl.style.opacity = '0';
+    });
+    const ring = document.getElementById('clap-ring');
+    if (ring) ring.classList.remove('active');
+  }, 2000);
+
+  setTimeout(() => {
+    const syncLabel = document.getElementById('sync-label');
+    if (syncLabel) syncLabel.classList.remove('visible');
+  }, 2800);
 }
 
 // ── Merge → Viewer ────────────────────────────────────────────────────
