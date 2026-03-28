@@ -1,0 +1,349 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:              #0A0A0F;
+  --surface:         #13131A;
+  --surface-2:       #1A1A24;
+  --border:          #1E1E2E;
+  --border-bright:   #2E2E44;
+  --text:            #E8E8F0;
+  --text-muted:      #6B6B7A;
+  --text-dim:        #3A3A4A;
+  --cyan:            #00D4FF;
+  --cyan-dim:        rgba(0,212,255,0.12);
+  --orange:          #FF6B35;
+  --orange-dim:      rgba(255,107,53,0.12);
+  --space-sm:        8px;
+  --space-md:        16px;
+  --space-lg:        24px;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Geist', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Layout ── */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px var(--space-lg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.logo {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--cyan);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot-legend {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sport-tag {
+  background: var(--cyan-dim);
+  border: 1px solid rgba(0,212,255,0.3);
+  color: var(--cyan);
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  border-radius: 3px;
+}
+
+.upload-btn {
+  background: var(--orange-dim);
+  border: 1px solid rgba(255,107,53,0.4);
+  color: var(--orange);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-family: 'Geist', sans-serif;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.upload-btn:hover { background: rgba(255,107,53,0.2); }
+
+/* ── Main ── */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Seat Map ── */
+.map-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.map-panel svg {
+  cursor: crosshair;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 300px;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.sidebar-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Video Area ── */
+.video-area {
+  background: var(--bg);
+  aspect-ratio: 16/9;
+  margin: var(--space-md);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.video-area video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-placeholder {
+  color: var(--text-dim);
+  font-size: 12px;
+  text-align: center;
+}
+
+.play-icon {
+  font-size: 28px;
+  color: var(--orange);
+  margin-bottom: 6px;
+}
+
+/* ── Seat Info ── */
+.seat-info {
+  padding: 0 var(--space-md);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.info-label {
+  font-size: 10px;
+  font-family: 'Geist Mono', monospace;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+}
+
+.info-value { color: var(--text); }
+.info-value.cyan { color: var(--cyan); }
+.info-value.orange { color: var(--orange); }
+
+/* ── Loading State ── */
+.loading-state {
+  margin: var(--space-md);
+  padding: 12px;
+  background: rgba(255,107,53,0.08);
+  border: 1px solid rgba(255,107,53,0.2);
+}
+
+.loading-label {
+  font-size: 10px;
+  font-family: 'Geist Mono', monospace;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.loading-bar {
+  height: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.loading-fill {
+  height: 100%;
+  background: var(--orange);
+  animation: loadingPulse 2s ease-in-out infinite;
+}
+
+@keyframes loadingPulse {
+  0%   { width: 10%; }
+  50%  { width: 80%; }
+  100% { width: 10%; }
+}
+
+.loading-text {
+  font-size: 11px;
+  color: var(--orange);
+  margin-top: 6px;
+}
+
+/* ── Generate Button ── */
+.generate-btn {
+  margin: var(--space-md);
+  background: var(--orange-dim);
+  border: 1px solid rgba(255,107,53,0.4);
+  color: var(--orange);
+  padding: 12px;
+  font-size: 13px;
+  font-family: 'Geist', sans-serif;
+  cursor: pointer;
+  text-align: center;
+  width: calc(100% - 32px);
+  transition: background 0.15s;
+}
+
+.generate-btn:hover:not(:disabled) { background: rgba(255,107,53,0.2); }
+.generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Status Bar ── */
+.status-bar {
+  padding: 8px var(--space-md);
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  font-family: 'Geist Mono', monospace;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+/* ── Upload Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-bright);
+  padding: var(--space-lg);
+  width: 360px;
+}
+
+.modal h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+  color: var(--cyan);
+}
+
+.modal label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  margin-top: var(--space-sm);
+  font-family: 'Geist Mono', monospace;
+  letter-spacing: 0.06em;
+}
+
+.modal input[type="number"],
+.modal input[type="file"] {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: 'Geist', sans-serif;
+  margin-bottom: 4px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.btn-primary {
+  flex: 1;
+  background: var(--cyan-dim);
+  border: 1px solid rgba(0,212,255,0.4);
+  color: var(--cyan);
+  padding: 10px;
+  font-size: 13px;
+  font-family: 'Geist', sans-serif;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: 'Geist', sans-serif;
+  cursor: pointer;
+}

@@ -1,0 +1,8 @@
+node_modules/
+cache/uploads/
+cache/*.mp4
+cache/*.webm
+cache/index.json
+.env
+.env.example
+client/dist/
