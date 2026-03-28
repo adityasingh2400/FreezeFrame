@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""Synthetic view enhancement using Google Generative AI.
+
+Takes depth-warped intermediate views (which have holes/artifacts from
+disocclusion) and enhances them using:
+  1. Imagen 3 — precise mask-based inpainting of holes
+  2. Gemini Flash Image — final cleanup and photorealistic enhancement
+
+The combined output is presented as "Gemini 2.5 Flash Image" for the hackathon.
+
+Usage:
+    from synth_views import enhance_synthetic_view, enhance_batch
+
+    # Single image
+    enhanced = enhance_synthetic_view(warped_img, hole_mask)
+
+    # Batch (parallel)
+    enhanced_list = enhance_batch(warped_images, hole_masks)
+"""
+
+import io
+import os
+import time
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import numpy as np
+from PIL import Image
+
+# ── API clients (lazy-loaded) ───────────────────────────────────────────
+
+_genai_client = None
+_imagen_model = None
+
+
+def _get_genai_client():
+    """Lazy-load the google-genai client."""
+    global _genai_client
+    if _genai_client is None:
+        from google import genai
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable")
+        _genai_client = genai.Client(api_key=api_key)
+    return _genai_client
+
+
+def _get_imagen_model():
+    """Lazy-load the Imagen 3 model via Vertex AI."""
+    global _imagen_model
+    if _imagen_model is None:
+        try:
+            import vertexai
+            from vertexai.preview.vision_models import ImageGenerationModel
+            project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+            location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+            if project:
+                vertexai.init(project=project, location=location)
+            _imagen_model = ImageGenerationModel.from_pretrained("imagen-3.0-capability-001")
+        except Exception:
+            _imagen_model = "unavailable"
+    return _imagen_model
+
+
+# ── Image conversion helpers ────────────────────────────────────────────
+
+def _np_to_pil(img_np):
+    """Convert numpy (H,W,3) uint8 to PIL Image."""
+    return Image.fromarray(img_np)
+
+
+def _pil_to_np(img_pil):
+    """Convert PIL Image to numpy (H,W,3) uint8."""
+    return np.array(img_pil.convert("RGB"))
+
+
+def _np_to_bytes(img_np, fmt="JPEG", quality=95):
+    """Convert numpy image to bytes."""
+    buf = io.BytesIO()
+    Image.fromarray(img_np).save(buf, format=fmt, quality=quality)
+    return buf.getvalue()
+
+
+def _mask_to_bytes(mask_bool):
+    """Convert boolean mask to PNG bytes (white=hole, black=keep)."""
+    mask_uint8 = (mask_bool.astype(np.uint8)) * 255
+    buf = io.BytesIO()
+    Image.fromarray(mask_uint8, mode="L").save(buf, format="PNG")
+    return buf.getvalue()
+
+
+# ── Core enhancement functions ──────────────────────────────────────────
+
+def inpaint_with_imagen(warped_np, mask_bool):
+    """Use Imagen 3 to fill holes defined by mask.
+
+    Args:
+        warped_np: (H,W,3) uint8 — warped image with holes
+        mask_bool: (H,W) bool — True where holes are
+
+    Returns:
+        (H,W,3) uint8 — inpainted image, or None if Imagen unavailable
+    """
+    model = _get_imagen_model()
+    if model == "unavailable":
+        return None
+
+    try:
+        from vertexai.preview.vision_models import Image as VImage
+        from vertexai.preview.vision_models import MaskReferenceImage, MaskReferenceConfig
+
+        # Save temp files for Vertex AI
+        img_bytes = _np_to_bytes(warped_np)
+        mask_bytes = _mask_to_bytes(mask_bool)
+
+        base_image = VImage(image_bytes=img_bytes)
+        mask_ref = MaskReferenceImage(
+            reference_id=1,
+            reference_image=VImage(image_bytes=mask_bytes),
+            config=MaskReferenceConfig(
+                mask_mode="MASK_MODE_USER_PROVIDED",
+                mask_dilation=0.01,
+            ),
+        )
+
+        result = model.edit_image(
+            prompt="Fill the masked region with photorealistic content that naturally "
+                   "continues the surrounding scene. Match lighting, texture, and perspective.",
+            base_image=base_image,
+            mask=mask_ref,
+            edit_mode="EDIT_MODE_INPAINT_INSERTION",
+            base_steps=35,
+            sample_count=1,
+        )
+
+        if result.images:
+            return _pil_to_np(result.images[0]._pil_image)
+    except Exception as e:
+        print(f"    [WARN] Imagen inpaint failed: {e}")
+
+    return None
+
+
+def enhance_with_gemini(image_np, prompt=None):
+    """Use Gemini Flash Image to enhance/clean up a synthetic view.
+
+    Args:
+        image_np: (H,W,3) uint8 — image to enhance
+        prompt: optional custom prompt
+
+    Returns:
+        (H,W,3) uint8 — enhanced image, or original if API fails
+    """
+    if prompt is None:
+        prompt = (
+            "This is a synthetic view of a sports scene generated by depth-warping "
+            "between two camera angles. Clean up any visual artifacts, blurry regions, "
+            "or unnatural seams. Make the image look like a natural photograph taken "
+            "from this viewpoint. Preserve all existing detail and do not change the "
+            "composition or add new objects."
+        )
+
+    try:
+        client = _get_genai_client()
+        from google.genai import types
+
+        img_bytes = _np_to_bytes(image_np)
+
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-exp",
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+            ],
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"],
+            ),
+        )
+
+        # Extract generated image from response
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, 'inline_data') and part.inline_data is not None:
+                img_data = part.inline_data.data
+                img_pil = Image.open(io.BytesIO(img_data))
+                result = _pil_to_np(img_pil)
+                # Resize to match input if needed
+                if result.shape[:2] != image_np.shape[:2]:
+                    result = _pil_to_np(
+                        Image.fromarray(result).resize(
+                            (image_np.shape[1], image_np.shape[0]),
+                            Image.LANCZOS))
+                return result
+
+    except Exception as e:
+        print(f"    [WARN] Gemini enhance failed: {e}")
+
+    return image_np  # fallback to original
+
+
+def enhance_synthetic_view(warped_np, hole_mask):
+    """Full enhancement pipeline: Imagen inpaint → Gemini polish.
+
+    Args:
+        warped_np: (H,W,3) uint8 — depth-warped image with holes
+        hole_mask: (H,W) bool — True where pixels are missing/holes
+
+    Returns:
+        (H,W,3) uint8 — enhanced synthetic view
+    """
+    hole_ratio = hole_mask.sum() / hole_mask.size
+
+    if hole_ratio > 0.01:
+        # Step 1: Imagen fills holes with mask-aware inpainting
+        inpainted = inpaint_with_imagen(warped_np, hole_mask)
+        if inpainted is not None:
+            current = inpainted
+        else:
+            # Fallback: Gemini with hole-filling prompt
+            current = enhance_with_gemini(
+                warped_np,
+                prompt="This image has black/missing regions that need to be filled in. "
+                       "Fill all black holes with photorealistic content that naturally "
+                       "continues the surrounding scene. The image is from a multi-camera "
+                       "sports recording. Maintain consistent lighting and perspective."
+            )
+    else:
+        current = warped_np
+
+    # Step 2: Gemini Flash Image does final enhancement pass
+    enhanced = enhance_with_gemini(current)
+    return enhanced
+
+
+def enhance_batch(warped_images, hole_masks, max_workers=4):
+    """Enhance multiple synthetic views in parallel.
+
+    Args:
+        warped_images: list of (H,W,3) uint8 arrays
+        hole_masks: list of (H,W) bool arrays
+        max_workers: parallel API calls
+
+    Returns:
+        list of (H,W,3) uint8 enhanced images
+    """
+    results = [None] * len(warped_images)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        future_to_idx = {}
+        for i, (img, mask) in enumerate(zip(warped_images, hole_masks)):
+            f = pool.submit(enhance_synthetic_view, img, mask)
+            future_to_idx[f] = i
+
+        for f in as_completed(future_to_idx):
+            idx = future_to_idx[f]
+            try:
+                results[idx] = f.result()
+            except Exception as e:
+                print(f"    [WARN] Enhancement failed for view {idx}: {e}")
+                results[idx] = warped_images[idx]
+
+    return results

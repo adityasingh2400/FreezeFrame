@@ -2,54 +2,48 @@
 
 ## How to Run
 
-### Terminal 1 — Voice Proxy
+### One-time setup
 ```
-cd C:\Users\arusa\OneDrive\Desktop\AOA\hack\Replay
-python server/gemini_proxy.py
-```
-You should see:
-```
-[PROXY] Gemini Live session open
-[PROXY] Waiting for browser on ws://localhost:8765
+make install
+make setup-agent
 ```
 
-### Terminal 2 — Viewer
+### Start
 ```
-cd C:\Users\arusa\OneDrive\Desktop\AOA\hack\Replay\viewer
-npm run dev
+make start
 ```
 Open: **http://localhost:5173**
 
 ---
 
-## Voice Commands
+## Voice Control
 
-### Wake Word
-Gemini is **always listening** but only responds when directly addressed.
+### Activation
+**Hold spacebar** to talk. Release to stop. The AI responds after you release.
 
-| Trigger | Notes |
+| Action | What happens |
 |---|---|
-| **"Hey Gemini, ..."** | Main wake word |
-| **"Hey Freezeframe, ..."** | Alternative wake word |
-| **"FREEZEFRAME"** (shout it) | Jumps to most dramatic moment + boomerang |
+| **Hold spacebar + speak** | Mic active, voice sent to AI |
+| **Release spacebar** | Mic off, AI processes and responds |
 
 ---
 
 ### Demo Mode (default — fun, emotional, reactive)
 
-| Say | What happens |
-|---|---|
-| **"Hey Gemini, what the hell did I just watch"** | Emotional description of current frame |
-| **"Hey Gemini, what was that"** | Same — goes off about the moment |
-| **"Hey Gemini, describe this"** | Describes the exact frame currently on screen |
-| **"Hey Gemini, explain what's happening"** | Technical breakdown with personality |
-| **"Hey Gemini, freeze on the [release / jump / etc]"** | Navigates to that moment + boomerang |
-| **"Hey Gemini, show me the best moment"** | Picks most dramatic, navigates there |
-| **"Hey Gemini, blow my mind"** | Same as above |
-| **"Hey Gemini, zoom in"** / **"get closer"** | Zooms camera in |
-| **"Hey Gemini, zoom out"** / **"pull back"** | Zooms camera out |
-| **"Hey Gemini, reset zoom"** | Back to normal view |
-| **"Hey Gemini, calm down"** | It laughs, then immediately loses it again |
+| Say | Tool Called | What Happens |
+|---|---|---|
+| "describe this" / "what is this" / "what happened" | `describe_moment` | Emotional description of current frame |
+| "explain" / "how does this work" / "break it down" | `explain_moment` | Technical breakdown with personality |
+| "show me the [X]" / "go to [X]" / "freeze on [X]" | `navigate_to_moment` | Navigates to moment + boomerang |
+| "best moment" / "blow my mind" / "most dramatic" | `navigate_to_moment` | Picks most dramatic, navigates there |
+| "zoom in" / "closer" / "get in there" | `zoom_viewer(in)` | Zooms camera in |
+| "zoom out" / "pull back" / "wider" | `zoom_viewer(out)` | Zooms camera out |
+| "reset zoom" / "normal view" | `zoom_viewer(reset)` | Back to normal view |
+| "orbit" / "spin it" / "360" / "all angles" | `play_orbit` | Continuous rotation animation |
+| "stop" / "hold" / "freeze" / "pause" | `stop_orbit` | Stops orbit animation |
+| "boomerang" / "loop it" / "bounce" | `play_boomerang` | Back-and-forth loop |
+| "next angle" / "advance" | `step_frame(forward)` | Step one frame forward |
+| "previous" / "go back" | `step_frame(back)` | Step one frame back |
 
 ---
 
@@ -57,10 +51,10 @@ Gemini is **always listening** but only responds when directly addressed.
 
 | Say | What happens |
 |---|---|
-| **"pitch mode"** / **"hey gemini pitch mode"** | Switches to pitch mode |
-| **"demo mode"** / **"I got it"** / **"I'll take it"** | Switches back to demo mode |
+| **"pitch mode"** | Switches to pitch mode |
+| **"demo mode"** / **"I got it"** | Switches back to demo mode |
 
-**In pitch mode, Gemini knows:**
+**In pitch mode, the agent knows:**
 - What is Freezeframe
 - Why Gemini (vs anything else)
 - How gap filling works
@@ -76,38 +70,8 @@ Gemini is **always listening** but only responds when directly addressed.
 
 | Say | What happens |
 |---|---|
-| **"Gemini, the judge has a question"** | Next speaker answered directly, no wake word needed |
+| **"The judge has a question"** | Next speaker answered directly |
 | **"Judge, go ahead"** | Same — opens the floor |
-| **"Ask Gemini directly"** | Same |
-
-After answering, Gemini goes back to silence mode automatically.
-
----
-
-### Frame-Aware Description
-While **dragging the viewer**, Gemini tracks which frame you're on.
-When you say "describe this" or "explain this" it knows the exact frame + which labeled moment it matches.
-
----
-
-## Full Command Reference
-
-```
-FREEZEFRAME          → dramatic jump to best moment
-pitch mode           → judge Q&A mode
-demo mode            → fun/hype mode
-I got it             → exit pitch mode
-Gemini, describe this           → describes current frame
-Gemini, explain what's happening → tech breakdown
-Gemini, freeze on [X]           → navigate to moment
-Gemini, zoom in                 → zoom in
-Gemini, zoom out                → zoom out
-Gemini, reset zoom              → normal view
-Gemini, the judge has a question → open floor to judge
-Gemini, show me the best moment → most dramatic moment
-Gemini, blow my mind            → same
-Gemini, calm down               → it laughs
-```
 
 ---
 
@@ -115,12 +79,28 @@ Gemini, calm down               → it laughs
 
 | Component | What it does |
 |---|---|
-| `server/gemini_proxy.py` | Python WebSocket proxy — bridges browser ↔ Gemini Live |
-| `viewer/src/gemini_live.js` | Browser voice client — mic capture, audio playback, tool handling |
-| `viewer/src/main.js` | Three.js viewer — frame tracking, zoom, boomerang |
-| Gemini Live model | `gemini-3.1-flash-live-preview` |
-| Proxy port | `ws://localhost:8765` |
-| Viewer port | `http://localhost:5173` |
+| `server/voice_proxy.py` | Lightweight signing server — generates signed WebSocket URLs |
+| `server/create_agent.py` | Creates/updates the ElevenLabs Conversational AI agent |
+| `viewer/src/voice.js` | Browser voice client — 11Labs WebSocket, mic capture, tool execution |
+| `viewer/src/main.js` | Three.js viewer — frame tracking, zoom, boomerang, spacebar PTT |
+| `viewer/public/pcm-processor.js` | AudioWorklet — 32ms PCM chunks at 16kHz |
+| Voice engine | ElevenLabs Conversational AI (Charlie voice) |
+| Signing server | `ws://localhost:8765` |
+| Viewer | `http://localhost:5173` |
+
+---
+
+## Architecture
+
+```
+Browser mic → AudioWorklet (16kHz PCM)
+  → 11Labs WebSocket (direct, signed URL)
+    → STT + LLM + TTS (all 11Labs)
+  ← audio response + client tool calls
+Browser executes tools locally (navigate, zoom, orbit, etc.)
+```
+
+No Python proxy in the audio path. The signing server only runs once per session to issue a URL.
 
 ---
 
@@ -129,7 +109,8 @@ Gemini, calm down               → it laughs
 | Problem | Fix |
 |---|---|
 | "Mic not working" | Refresh browser, allow mic permissions |
-| "Browser disconnected" | Restart proxy, refresh browser |
-| "Not responding to voice" | Make sure you said "Hey Gemini" first |
-| "0 moments loaded" | Add videos to `raw_videos/` folder and restart proxy |
-| Proxy crashes | Check terminal for error, share with team |
+| "Voice server not running" | `make start` — signing server must be running |
+| "Not responding" | Hold spacebar while speaking. Check debug console |
+| "0 moments loaded" | Run `make setup-agent` to recreate agent with catalog |
+| "Session expired" | Refresh the page (gets a new signed URL) |
+| "Agent not found" | Check `.env` for `ELEVENLABS_AGENT_ID`, run `make setup-agent` |

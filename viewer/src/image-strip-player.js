@@ -223,10 +223,136 @@ export class ImageStripPlayer {
     requestAnimationFrame(decelerate);
   }
 
+  /**
+   * Play a boomerang animation: sweep forward then reverse through all frames.
+   * Returns a promise that resolves when the animation completes.
+   */
+  playBoomerang(loops = 1, fps = 24) {
+    return new Promise((resolve) => {
+      if (this._boomerangRaf) cancelAnimationFrame(this._boomerangRaf);
+
+      const total = this._totalFrames;
+      if (total < 2) { resolve(); return; }
+
+      const forward = [];
+      for (let f = 0; f < total; f++) forward.push(f);
+      const backward = [...forward].slice(1, -1).reverse();
+      const sequence = [...forward, ...backward];
+
+      let idx = 0;
+      let lastTime = null;
+      const delay = 1000 / fps;
+      const totalSteps = sequence.length * loops;
+
+      const step = (ts) => {
+        if (lastTime === null) lastTime = ts;
+        if (ts - lastTime >= delay) {
+          const frame = sequence[idx % sequence.length];
+          this._currentFrame = frame;
+          const tex = this._textures[frame];
+          if (tex) {
+            this._material.map = tex;
+            this._material.needsUpdate = true;
+          }
+          if (this._onFrameChange) this._onFrameChange(frame);
+          idx++;
+          lastTime = ts;
+        }
+        if (idx < totalSteps) {
+          this._boomerangRaf = requestAnimationFrame(step);
+        } else {
+          this._boomerangRaf = null;
+          resolve();
+        }
+      };
+
+      this._boomerangRaf = requestAnimationFrame(step);
+    });
+  }
+
+  /**
+   * Entry animation: sweep forward 0→end, pause, then reverse end→0.
+   */
+  playForwardReverse(fps = 24, pauseMs = 400) {
+    return new Promise((resolve) => {
+      if (this._boomerangRaf) cancelAnimationFrame(this._boomerangRaf);
+
+      const total = this._totalFrames;
+      if (total < 2) { resolve(); return; }
+
+      const forward = [];
+      for (let f = 0; f < total; f++) forward.push(f);
+      const reverse = [];
+      for (let f = total - 1; f >= 0; f--) reverse.push(f);
+
+      const delay = 1000 / fps;
+      let phase = 'forward';
+      let idx = 0;
+      let lastTime = null;
+      let pauseStart = null;
+
+      const step = (ts) => {
+        if (lastTime === null) lastTime = ts;
+
+        if (phase === 'pause') {
+          if (ts - pauseStart >= pauseMs) {
+            phase = 'reverse';
+            idx = 0;
+            lastTime = ts;
+          }
+          this._boomerangRaf = requestAnimationFrame(step);
+          return;
+        }
+
+        if (ts - lastTime >= delay) {
+          const seq = phase === 'forward' ? forward : reverse;
+          const frame = seq[idx];
+          this._currentFrame = frame;
+          const tex = this._textures[frame];
+          if (tex) { this._material.map = tex; this._material.needsUpdate = true; }
+          if (this._onFrameChange) this._onFrameChange(frame);
+          idx++;
+          lastTime = ts;
+
+          if (idx >= seq.length) {
+            if (phase === 'forward') {
+              phase = 'pause';
+              pauseStart = ts;
+            } else {
+              this._boomerangRaf = null;
+              resolve();
+              return;
+            }
+          }
+        }
+
+        this._boomerangRaf = requestAnimationFrame(step);
+      };
+
+      this._boomerangRaf = requestAnimationFrame(step);
+    });
+  }
+
+  stopBoomerang() {
+    if (this._boomerangRaf) {
+      cancelAnimationFrame(this._boomerangRaf);
+      this._boomerangRaf = null;
+    }
+  }
+
   dispose() {
+    this.stopBoomerang();
+    this._animating = false;
+    this._dragging = false;
+    this._onFrameChange = null;
     this._textures.forEach((t) => t?.dispose());
+    this._textures = [];
     this._material.dispose();
     if (this._geometry) this._geometry.dispose();
     if (this._quad?.parent) this._quad.parent.remove(this._quad);
+    this._quad = null;
+    this._geometry = null;
+    this._totalFrames = 0;
+    this._currentFrame = 0;
   }
 }
