@@ -95,14 +95,18 @@ fi
 PIP_FLAGS="--break-system-packages --no-deps"
 PIP_FLAGS_FULL="--break-system-packages"
 
-pip install -q $PIP_FLAGS_FULL --ignore-installed plyfile lpips pytorch_msssim "imageio[ffmpeg]" open3d scikit-image matplotlib tqdm opencv-python-headless 2>&1 | tail -5 || {
+pip install -q $PIP_FLAGS_FULL plyfile lpips pytorch_msssim "imageio[ffmpeg]" scikit-image matplotlib tqdm opencv-python-headless 2>&1 | tail -5 || {
     warn "Bulk install had issues, trying one by one..."
-    for pkg in plyfile lpips pytorch_msssim "imageio[ffmpeg]" open3d scikit-image matplotlib tqdm opencv-python-headless; do
+    for pkg in plyfile lpips pytorch_msssim "imageio[ffmpeg]" scikit-image matplotlib tqdm opencv-python-headless; do
         pip install -q --break-system-packages "$pkg" 2>/dev/null || \
         pip install -q --break-system-packages --ignore-installed "$pkg" 2>/dev/null || \
         warn "Failed to install $pkg"
     done
 }
+
+# Verify torch wasn't clobbered by a dependency
+TORCH_AFTER=$(python3 -c "import torch; print(torch.__version__)" 2>/dev/null)
+log "Torch after installs: $TORCH_AFTER"
 
 TORCH_SHORT=$(python3 -c "import torch; v=torch.__version__.split('+')[0].rsplit('.',1)[0]; print(v)")
 CUDA_SHORT=$(python3 -c "import torch; print(torch.version.cuda.replace('.','')[:3])")
