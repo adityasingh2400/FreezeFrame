@@ -28,8 +28,8 @@
   "total_frames": 21,
   "moment": {
     "label": "The Keanu Dodge",
-    "description": "Frame 102"
+    "description": "Manually aligned per-camera"
   },
   "pipeline": "bullet-time-v2",
-  "generated_at": "2026-03-28T11:25:28.296640"
+  "generated_at": "2026-03-28T11:49:17.376257"
 }

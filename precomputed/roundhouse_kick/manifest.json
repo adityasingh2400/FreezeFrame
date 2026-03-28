@@ -28,8 +28,8 @@
   "total_frames": 21,
   "moment": {
     "label": "The Roundhouse Kick",
-    "description": "Frame 736"
+    "description": "Manually aligned per-camera"
   },
   "pipeline": "bullet-time-v2",
-  "generated_at": "2026-03-28T11:27:40.782533"
+  "generated_at": "2026-03-28T11:44:56.804810"
 }
