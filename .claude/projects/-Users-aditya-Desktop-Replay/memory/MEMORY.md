@@ -1,0 +1,2 @@
+- [Project goals](project_goals.md) — Two polish tracks: input adaptability + Gemini Live voice interaction
+- [Gemini Live integration](project_gemini_live.md) — Voice-controlled 4D replay viewer via Gemini Live WebSocket API

@@ -3,16 +3,16 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const PRESETS = {
   front: {
-    position: new THREE.Vector3(0, 1, 5),
-    target: new THREE.Vector3(0, 0, 0),
+    position: new THREE.Vector3(0, 1, 3.5),
+    target: new THREE.Vector3(0, 0.5, 0),
   },
   side: {
-    position: new THREE.Vector3(5, 1, 0),
-    target: new THREE.Vector3(0, 0, 0),
+    position: new THREE.Vector3(3.5, 1, 0),
+    target: new THREE.Vector3(0, 0.5, 0),
   },
   top: {
-    position: new THREE.Vector3(0, 6, 0.01),
-    target: new THREE.Vector3(0, 0, 0),
+    position: new THREE.Vector3(0, 4, 0.01),
+    target: new THREE.Vector3(0, 0.5, 0),
   },
 };
 
@@ -25,8 +25,13 @@ export class CameraController {
     this._controls.rotateSpeed = 0.8;
     this._controls.zoomSpeed = 1.2;
     this._controls.panSpeed = 0.6;
-    this._controls.minDistance = 0.5;
-    this._controls.maxDistance = 50;
+    this._controls.minDistance = 1.0;
+    this._controls.maxDistance = 12;
+
+    // Constrain vertical orbit: don't let camera go below ground or directly overhead.
+    // This keeps the camera in the "good coverage" hemisphere where the 4 phones captured.
+    this._controls.minPolarAngle = Math.PI * 0.15;  // ~27 deg from top
+    this._controls.maxPolarAngle = Math.PI * 0.75;  // ~135 deg (can't go under)
 
     this._animating = false;
     this._animStart = null;

@@ -6,7 +6,7 @@
   <title>Freezeframe</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles.css" />
 </head>
 <body>
@@ -27,65 +27,60 @@
   <div id="clap-flash"></div>
   <div id="clap-ring"></div>
 
+  <!-- ── COLMAP Processing Screen ── -->
+  <div id="colmap-screen">
+    <div id="colmap-wordmark">FREEZEFRAME</div>
+    <canvas id="colmap-canvas"></canvas>
+    <div id="colmap-videos"></div>
+    <div id="colmap-status">
+      <div id="colmap-step" class="colmap-step-text"></div>
+      <div id="colmap-progress-bar"><div id="colmap-progress-fill"></div></div>
+      <div id="colmap-detail" class="colmap-detail-text"></div>
+    </div>
+  </div>
+
   <!-- ── Agent View ── -->
   <div id="agent-view">
     <div id="agent-wordmark">FREEZEFRAME</div>
     <div id="orbit-container">
-
-      <!-- Central agent circle -->
       <div id="agent-circle">
         <div id="agent-bars">
-          <div class="bar"></div>
-          <div class="bar"></div>
-          <div class="bar"></div>
-          <div class="bar"></div>
-          <div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div>
         </div>
       </div>
-
-      <!-- Orbit path (visual ring) -->
       <div id="orbit-ring"></div>
-
-      <!-- Thumbnail slots — JS populates labels and previews -->
-      <div class="thumb" id="thumb-0"><span class="thumb-label"></span></div>
-      <div class="thumb" id="thumb-1"><span class="thumb-label"></span></div>
-      <div class="thumb" id="thumb-2"><span class="thumb-label"></span></div>
-      <div class="thumb" id="thumb-3"><span class="thumb-label"></span></div>
-      <div class="thumb" id="thumb-4"><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-0"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-1"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-2"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-3"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-4"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
     </div>
-    <div id="agent-hint">speak to begin</div>
+    <div id="agent-hint">speak to explore moments</div>
   </div>
 
   <!-- ── Viewer ── -->
   <canvas id="viewport"></canvas>
   <div id="viewer-hud">
     <div id="viewer-wordmark">FREEZEFRAME</div>
+    <button id="back-btn">&larr; BACK</button>
+    <div id="bt-moment-label"></div>
+    <div id="bt-moment-desc"></div>
+    <div id="bt-hud-bottom">
+      <div id="bt-frame-counter">
+        <span id="frame-counter">001</span>
+        <span id="frame-label">/ 021</span>
+      </div>
+      <div id="bt-source-badge" class="source-real">Real Camera</div>
+      <div id="bt-angle-bar"><div id="bt-angle-fill"></div></div>
+      <button id="bt-boomerang-btn">&#x27F3; Boomerang</button>
+    </div>
+    <div id="bt-drag-hint">drag to rotate</div>
     <div id="viewer-overlay-text" data-mode="output"></div>
     <div id="listening-indicator" data-state="idle">
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div>
     </div>
-  </div>
-
-  <!-- ── Live Transcript Strip ── -->
-  <div id="transcript-strip">
-    <div id="transcript-you" class="transcript-row">
-      <span class="transcript-label">YOU</span>
-      <span class="transcript-text" id="transcript-you-text"></span>
-    </div>
-    <div id="transcript-ai" class="transcript-row">
-      <span class="transcript-label">GEMINI</span>
-      <span class="transcript-text" id="transcript-ai-text"></span>
-    </div>
-  </div>
-
-  <!-- ── Debug Console ── -->
-  <div id="debug-console">
-    <div id="debug-header">LIVE TRANSCRIPT <span id="debug-toggle" onclick="document.getElementById('debug-console').classList.toggle('collapsed')">▼</span></div>
-    <div id="debug-log"></div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

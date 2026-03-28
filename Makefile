@@ -1,64 +1,26 @@
-.PHONY: setup sync colmap train export view proxy demo validate validate-a validate-b validate-c validate-d
+VENV_PYTHON = $(CURDIR)/.venv/bin/python
+VIEWER_PORT = 5173
 
-PYTHON ?= python3
+.PHONY: start stop install setup-agent
 
-# ============================================================
-# Setup
-# ============================================================
+start:
+	@echo "Starting viewer on http://localhost:$(VIEWER_PORT)..."
+	@lsof -ti:$(VIEWER_PORT) | xargs kill -9 2>/dev/null || true
+	@sleep 0.3
+	cd viewer && npm run dev
 
-setup:
-	$(PYTHON) -m pip install -r requirements.txt
+stop:
+	@lsof -ti:$(VIEWER_PORT) | xargs kill -9 2>/dev/null || true
+	@echo "Stopped."
 
-# ============================================================
-# Pipeline Stages
-# ============================================================
+install:
+	python3 -m venv .venv
+	$(VENV_PYTHON) -m pip install --upgrade pip
+	$(VENV_PYTHON) -m pip install websockets google-genai pydantic python-dotenv opencv-python-headless numpy requests
+	cd viewer && npm install
+	@echo "Done. Run 'make setup-agent' then 'make start' to launch."
 
-sync:
-	$(PYTHON) scripts/stage1_sync.py
-
-colmap:
-	$(PYTHON) scripts/stage2_colmap.py
-
-colmap-sparse:
-	$(PYTHON) scripts/stage2_colmap.py --sparse-only
-
-
-train:
-	$(PYTHON) scripts/stage3_4dgs.py
-
-export:
-	@echo "Export is part of stage3_4dgs.py — run 'make train'"
-
-# ============================================================
-# Viewer + Gemini
-# ============================================================
-
-view:
-	$(PYTHON) scripts/stage4_viewer.py
-
-proxy:
-	$(PYTHON) server/gemini_proxy.py
-
-demo: download-demo view
-
-download-demo:
-	$(PYTHON) scripts/download_demo_scene.py
-
-# ============================================================
-# Validation
-# ============================================================
-
-validate-a:
-	$(PYTHON) scripts/validate_contracts.py a
-
-validate-b:
-	$(PYTHON) scripts/validate_contracts.py b
-
-validate-c:
-	$(PYTHON) scripts/validate_contracts.py c
-
-validate-d:
-	@echo "Contract D validation is POST-MVP"
-
-validate:
-	$(PYTHON) scripts/validate_contracts.py all
+setup-agent:
+	@echo "Creating/updating ElevenLabs agent..."
+	$(VENV_PYTHON) server/create_agent.py
+	@echo "Agent ready. Run 'make start' to launch."

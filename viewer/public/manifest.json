@@ -1,0 +1,31 @@
+{
+  "name": "Replay \u2014 Bullet Time",
+  "mode": "image-strip",
+  "frames": [
+    "cam01.jpg",
+    "synth_cam01_cam02_a.jpg",
+    "synth_cam01_cam02_b.jpg",
+    "synth_cam01_cam02_c.jpg",
+    "cam02.jpg",
+    "synth_cam02_cam03_a.jpg",
+    "synth_cam02_cam03_b.jpg",
+    "synth_cam02_cam03_c.jpg",
+    "cam03.jpg",
+    "synth_cam03_cam04_a.jpg",
+    "synth_cam03_cam04_b.jpg",
+    "synth_cam03_cam04_c.jpg",
+    "cam04.jpg",
+    "synth_cam04_cam05_a.jpg",
+    "synth_cam04_cam05_b.jpg",
+    "synth_cam04_cam05_c.jpg",
+    "cam05.jpg"
+  ],
+  "baseDir": "/bullet-time-v3/",
+  "total_frames": 17,
+  "moment": {
+    "label": "The Keanu Dodge",
+    "description": "v4: scatter filter + temporal smoothing"
+  },
+  "pipeline": "bullet-time-v2",
+  "generated_at": "2026-03-28T11:01:47.072670"
+}

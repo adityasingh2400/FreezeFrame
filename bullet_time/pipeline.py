@@ -38,7 +38,7 @@ from .gap_filler import fill_all_gaps, write_strip
 RAW_VIDEOS_DIR = Path("raw_videos")
 SCENE_IMAGES_DIR = Path("scene/images")
 OUTPUT_DIR = Path("viewer/public/bullet-time")
-CATALOG_CACHE = Path("bullet_time_catalog.json")
+CATALOG_CACHE = Path("bullet_time/bullet_time_catalog.json")
 VIEWS_PER_GAP = 3
 
 

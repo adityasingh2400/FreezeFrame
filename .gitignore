@@ -15,16 +15,19 @@ scene/images/cam*/*.jpg
 # scene/metadata.json
 
 # Training output
-output/checkpoints/
-output/frames/*.ply
-output/frames/*.splat
-output/output_meta.json
+scratch/output/checkpoints/
+scratch/output/frames/*.ply
+scratch/output/frames/*.splat
+scratch/output/output_meta.json
 
 # Gap repair (post-MVP)
-gaps/gap_map.json
-gaps/gap_meta.json
-gaps/anchor_views/*.png
-gaps/repaired_views/*.png
+scratch/gaps/gap_map.json
+scratch/gaps/gap_meta.json
+scratch/gaps/anchor_views/*.png
+scratch/gaps/repaired_views/*.png
+
+# Scratch / debug artifacts
+scratch/
 
 # Node
 node_modules/
@@ -51,6 +54,18 @@ Thumbs.db
 .ssh/
 *.pem
 *.key
+
+# Large generated/downloaded dirs
+4DGaussians/
+viewer/public/frames/
+viewer/public/raw_videos/
+viewer/public/bullet-time/
+viewer/public/bullet-time-v2/
+viewer/public/bullet-time-v3/
+viewer/public/demo/
+viewer/public/test-gap/
+viewer/public/test-gap2/
+viewer/public/precomputed
 
 # Keep gitkeep files
 !.gitkeep
