@@ -75,7 +75,7 @@ body {
 
 #landing-wordmark {
   font-family: var(--font-mono);
-  font-size: 22px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: 0.38em;
   color: var(--maroon);
@@ -91,7 +91,7 @@ body {
   justify-content: center;
   width: 420px;
   height: 200px;
-  border: 2px solid var(--border-bright);
+  border: 2px dashed var(--border-bright);
   border-radius: 4px;
   background: var(--surface);
   cursor: pointer;
