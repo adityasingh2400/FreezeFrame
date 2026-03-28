@@ -80,6 +80,7 @@ async function initScene() {
 
     try {
         const viewer = new GaussianSplats3D.Viewer({
+            rootElement: document.getElementById("canvas-container"),
             selfDrivenMode: true,
             useBuiltInControls: true,
             initialCameraPosition: [0, 0, -state.camera.zoom],

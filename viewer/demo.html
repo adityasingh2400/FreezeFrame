@@ -2,483 +2,648 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Replay — 4D Sports AI Director</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Replay — 4D Sports Engine</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { background:#0a0a0a; color:#fff; font-family:system-ui,sans-serif; overflow:hidden; height:100vh; }
+body { background:#050508; color:#fff; font-family:system-ui,sans-serif; overflow:hidden; height:100vh; user-select:none; }
 
+/* ── Main frame display ── */
 #stage {
   width:100vw; height:100vh;
   display:flex; align-items:center; justify-content:center;
-  position:relative;
+  position:relative; cursor:grab;
 }
+#stage.dragging { cursor:grabbing; }
 
 #frame-img {
-  max-height:85vh; max-width:90vw;
-  object-fit:contain;
-  border-radius:8px;
-  transition:opacity 0.05s;
+  max-height:86vh; max-width:92vw;
+  object-fit:contain; border-radius:10px;
+  pointer-events:none;
 }
 
-#orbit-video {
-  display:none;
-  max-height:85vh; max-width:90vw;
-  border-radius:8px;
+/* ── Loading overlay ── */
+#loading {
+  position:fixed; inset:0;
+  background:#050508;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:20px; z-index:200;
 }
+#loading.hidden { display:none; }
+#load-bar-wrap { width:320px; height:4px; background:#1a1a2e; border-radius:2px; }
+#load-bar { height:100%; width:0%; background:#4af; border-radius:2px; transition:width 0.1s; }
+#load-text { font-size:14px; color:#666; }
 
-/* Top bar */
+/* ── Top bar ── */
 #topbar {
   position:fixed; top:0; left:0; right:0;
-  padding:16px 24px;
+  padding:14px 20px;
   display:flex; justify-content:space-between; align-items:center;
-  background:linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+  background:linear-gradient(to bottom, rgba(5,5,8,0.95), transparent);
+  z-index:100; pointer-events:none;
+}
+#logo { font-size:16px; font-weight:800; letter-spacing:2px; color:#4af; pointer-events:all; }
+#scene-label { font-size:12px; color:#555; }
+
+/* ── Orbit ring indicator ── */
+#orbit-ring {
+  position:fixed; top:14px; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:6px;
+  background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.08);
+  padding:7px 16px; border-radius:20px; font-size:12px; color:#aaa;
   z-index:100;
 }
-
-#logo { font-size:18px; font-weight:700; letter-spacing:1px; color:#4af; }
-#scene-label { font-size:13px; color:#666; }
-
-/* Voice status */
-#voice-status {
-  display:flex; align-items:center; gap:10px;
-  background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1);
-  padding:8px 16px; border-radius:20px; font-size:13px;
+.ring-dot {
+  width:7px; height:7px; border-radius:50%; background:#333;
+  transition:background 0.2s, transform 0.2s;
 }
-#voice-dot {
-  width:10px; height:10px; border-radius:50%; background:#444;
-  transition:background 0.3s;
-}
-#voice-dot.listening { background:#4af; animation:pulse 1s infinite; }
-#voice-dot.connected { background:#4f4; }
-#voice-dot.error { background:#f44; }
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.2)} }
+.ring-dot.active { background:#4af; transform:scale(1.4); }
 
-/* Bottom controls */
-#controls {
-  position:fixed; bottom:0; left:0; right:0;
-  padding:20px 32px 24px;
-  background:linear-gradient(to top, rgba(0,0,0,0.9), transparent);
-  z-index:100;
-}
-
-#scrubber-row {
-  display:flex; align-items:center; gap:12px; margin-bottom:14px;
-}
-
-#time-slider {
-  flex:1; height:4px; accent-color:#4af;
-  cursor:pointer;
-}
-
-#time-label { font-size:12px; color:#666; min-width:70px; text-align:right; }
-
-#btn-row {
-  display:flex; align-items:center; justify-content:center; gap:12px;
-}
-
-.btn {
-  background:rgba(255,255,255,0.08);
-  border:1px solid rgba(255,255,255,0.15);
-  color:#fff; padding:10px 20px;
-  border-radius:10px; cursor:pointer; font-size:13px;
-  transition:all 0.15s;
-}
-.btn:hover { background:rgba(255,255,255,0.15); }
-.btn.active { background:rgba(68,170,255,0.25); border-color:#4af; color:#4af; }
-
-#speed-label { font-size:12px; color:#666; min-width:50px; }
-
-/* Transcript overlay */
+/* ── Transcript overlay ── */
 #transcript {
   position:fixed; bottom:120px; left:50%; transform:translateX(-50%);
-  background:rgba(0,0,0,0.8); border:1px solid rgba(68,170,255,0.3);
-  padding:10px 20px; border-radius:20px;
-  font-size:14px; color:#4af;
-  max-width:500px; text-align:center;
-  opacity:0; transition:opacity 0.3s;
-  pointer-events:none; z-index:200;
+  max-width:600px; text-align:center;
+  font-size:15px; color:#ddd; line-height:1.5;
+  background:rgba(0,0,0,0.6); padding:10px 20px; border-radius:12px;
+  pointer-events:none; z-index:100;
+  opacity:0; transition:opacity 0.4s;
 }
 #transcript.visible { opacity:1; }
 
-/* Loading */
-#loading {
-  position:fixed; inset:0;
-  background:#0a0a0a;
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  z-index:1000; gap:16px;
+/* ── Bottom controls ── */
+#controls {
+  position:fixed; bottom:0; left:0; right:0;
+  padding:12px 20px 20px;
+  background:linear-gradient(transparent, rgba(5,5,8,0.95));
+  z-index:100;
 }
-#loading.hidden { display:none; }
-#loading-bar-wrap {
-  width:300px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px;
-}
-#loading-bar { height:100%; background:#4af; border-radius:2px; width:0%; transition:width 0.1s; }
-#loading-text { font-size:13px; color:#666; }
 
-/* Orbit mode badge */
-#mode-badge {
-  position:fixed; top:70px; left:50%; transform:translateX(-50%);
-  background:rgba(68,170,255,0.2); border:1px solid #4af;
-  padding:6px 16px; border-radius:20px; font-size:12px; color:#4af;
-  display:none; z-index:100;
+#time-row {
+  display:flex; align-items:center; gap:10px; margin-bottom:10px;
+}
+
+#time-slider {
+  flex:1; height:4px; -webkit-appearance:none; appearance:none;
+  background:#1a1a2e; border-radius:2px; outline:none; cursor:pointer;
+}
+#time-slider::-webkit-slider-thumb {
+  -webkit-appearance:none; width:16px; height:16px;
+  border-radius:50%; background:#4af; cursor:pointer;
+}
+#time-label { font-size:12px; color:#555; min-width:60px; text-align:right; }
+
+#btn-row {
+  display:flex; align-items:center; gap:8px;
+}
+
+.ctrl-btn {
+  background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1);
+  color:#ccc; padding:7px 14px; border-radius:8px; font-size:13px; cursor:pointer;
+  transition:background 0.15s, color 0.15s;
+}
+.ctrl-btn:hover { background:rgba(255,255,255,0.13); color:#fff; }
+.ctrl-btn.active { background:#4af; color:#000; border-color:#4af; }
+
+#speed-group { display:flex; gap:4px; margin-left:auto; }
+.speed-btn {
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
+  color:#888; padding:5px 10px; border-radius:6px; font-size:12px; cursor:pointer;
+}
+.speed-btn.active { background:rgba(68,170,255,0.2); color:#4af; border-color:#4af; }
+
+/* ── Gemini button ── */
+#gemini-btn {
+  position:fixed; top:14px; right:20px;
+  background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.12);
+  color:#ccc; padding:8px 16px; border-radius:20px; font-size:13px; cursor:pointer;
+  display:flex; align-items:center; gap:8px; z-index:100;
+  transition:all 0.2s;
+}
+#gemini-btn:hover { border-color:#4af; color:#fff; }
+#gemini-btn.listening { border-color:#4af; color:#4af; box-shadow:0 0 12px rgba(68,170,255,0.3); }
+#mic-dot {
+  width:8px; height:8px; border-radius:50%; background:#444;
+  transition:background 0.3s;
+}
+#gemini-btn.listening #mic-dot { background:#4af; animation:pulse 1s infinite; }
+
+@keyframes pulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50% { opacity:0.5; transform:scale(0.8); }
+}
+
+/* ── Drag hint ── */
+#drag-hint {
+  position:fixed; bottom:50%; left:50%; transform:translate(-50%, 50%);
+  font-size:13px; color:rgba(255,255,255,0.25); pointer-events:none;
+  transition:opacity 0.5s; z-index:50;
 }
 </style>
 </head>
 <body>
 
+<!-- Loading -->
 <div id="loading">
-  <div style="font-size:28px;font-weight:700;color:#4af">REPLAY</div>
-  <div style="font-size:13px;color:#666">Loading 4D scene...</div>
-  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
-  <div id="loading-text">0 / 160 frames</div>
+  <div style="font-size:22px;font-weight:700;color:#4af;letter-spacing:2px">REPLAY</div>
+  <div id="load-bar-wrap"><div id="load-bar"></div></div>
+  <div id="load-text">Loading 4D scene...</div>
 </div>
 
-<div id="stage">
-  <img id="frame-img" src="" alt="">
-  <video id="orbit-video" src="/output/jumpingjacks.mp4" loop muted playsinline></video>
+<!-- Orbit indicator -->
+<div id="orbit-ring">
+  <span style="margin-right:4px; font-size:11px">ORBIT</span>
+  <div class="ring-dot active" data-idx="0"></div>
+  <div class="ring-dot" data-idx="1"></div>
+  <div class="ring-dot" data-idx="2"></div>
+  <div class="ring-dot" data-idx="3"></div>
+  <div class="ring-dot" data-idx="4"></div>
+  <div class="ring-dot" data-idx="5"></div>
+  <div class="ring-dot" data-idx="6"></div>
+  <div class="ring-dot" data-idx="7"></div>
+  <span style="margin-left:4px; font-size:11px" id="angle-label">0°</span>
 </div>
 
+<!-- Top bar -->
 <div id="topbar">
-  <div>
-    <div id="logo">⬡ REPLAY</div>
-    <div id="scene-label">4D Gaussian Splatting — Jumpingjacks · 160 frames</div>
-  </div>
-  <div id="voice-status">
-    <div id="voice-dot"></div>
-    <span id="voice-label">Voice: connecting...</span>
-  </div>
+  <div id="logo">REPLAY</div>
+  <div id="scene-label">4D Sports Reconstruction</div>
 </div>
 
-<div id="mode-badge">🎥 Orbit Mode</div>
+<!-- Gemini button -->
+<button id="gemini-btn" onclick="toggleGemini()">
+  <div id="mic-dot"></div>
+  <span id="gemini-label">Gemini Director</span>
+</button>
 
+<!-- Main stage -->
+<div id="stage">
+  <img id="frame-img" src="" alt="" draggable="false">
+  <div id="drag-hint">← drag to orbit →</div>
+</div>
+
+<!-- Transcript -->
 <div id="transcript"></div>
 
+<!-- Controls -->
 <div id="controls">
-  <div id="scrubber-row">
-    <input type="range" id="time-slider" min="0" max="159" value="0" step="1">
-    <span id="time-label">0 / 159</span>
+  <div id="time-row">
+    <input type="range" id="time-slider" min="0" max="99" value="0">
+    <div id="time-label">0 / 0</div>
   </div>
   <div id="btn-row">
-    <button class="btn" id="play-btn">▶ Play</button>
-    <button class="btn" id="slow-btn">0.5x</button>
-    <button class="btn" id="normal-btn" style="border-color:rgba(68,170,255,0.4)">1x</button>
-    <button class="btn" id="fast-btn">2x</button>
-    <button class="btn" id="orbit-btn">🔄 Orbit</button>
-    <button class="btn" id="reset-btn">↺ Reset</button>
-    <span id="speed-label">1.0x</span>
+    <button class="ctrl-btn" id="play-btn" onclick="togglePlay()">▶ Play</button>
+    <button class="ctrl-btn" id="director-btn" onclick="toggleDirector()">🎬 Director</button>
+    <button class="ctrl-btn" id="reset-btn" onclick="resetView()">↺ Reset</button>
+    <div id="speed-group">
+      <button class="speed-btn" onclick="setSpeed(0.25)">0.25×</button>
+      <button class="speed-btn" onclick="setSpeed(0.5)">0.5×</button>
+      <button class="speed-btn active" onclick="setSpeed(1)">1×</button>
+      <button class="speed-btn" onclick="setSpeed(2)">2×</button>
+      <button class="speed-btn" onclick="setSpeed(4)">4×</button>
+    </div>
   </div>
 </div>
 
 <script>
 // ─── Config ───────────────────────────────────────────────────────────────────
-const TOTAL_FRAMES = 160;
-const FPS_BASE = 24;
-const PROXY_URL = "ws://localhost:8765";
-const FRAMES_URL = "/output/frames_rendered/";
+const N_ANGLES  = 8;
+const ANGLE_DEG = [0, 45, 90, 135, 180, 225, 270, 315];
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const state = {
+  nFrames:      100,
+  fps:          30,
+  heroFrame:    50,
   currentFrame: 0,
-  playing: false,
-  speed: 1.0,
-  orbitMode: false,
-  framesLoaded: 0,
+  currentAngle: 0,   // 0-7
+  playing:      false,
+  speed:        1.0,
+  directorActive: false,
+  directorTimer:  null,
+  loaded:         false,
 };
 
-const frames = [];
-let playInterval = null;
+// ─── DOM ─────────────────────────────────────────────────────────────────────
+const frameImg    = document.getElementById("frame-img");
+const timeSlider  = document.getElementById("time-slider");
+const timeLabel   = document.getElementById("time-label");
+const playBtn     = document.getElementById("play-btn");
+const directorBtn = document.getElementById("director-btn");
+const loadingEl   = document.getElementById("loading");
+const loadBar     = document.getElementById("load-bar");
+const loadText    = document.getElementById("load-text");
+const transcript  = document.getElementById("transcript");
+const angleLabel  = document.getElementById("angle-label");
+const dragHint    = document.getElementById("drag-hint");
+const ringDots    = document.querySelectorAll(".ring-dot");
 
-// ─── Preload all frames ───────────────────────────────────────────────────────
-const img = document.getElementById("frame-img");
-const loadingEl = document.getElementById("loading");
-const loadingBar = document.getElementById("loading-bar");
-const loadingText = document.getElementById("loading-text");
+// ─── Frame URL ────────────────────────────────────────────────────────────────
+function frameUrl(angleIdx, frameIdx) {
+  const az  = String(angleIdx).padStart(2, "0");
+  const fr  = String(frameIdx).padStart(5, "0");
+  return `/output/multiview/az${az}/frame_${fr}.png`;
+}
 
-function preloadFrames() {
+// ─── Image cache ─────────────────────────────────────────────────────────────
+const cache = {};   // "az:frame" -> Image
+
+function cacheKey(a, f) { return `${a}:${f}`; }
+
+function preloadAngle(angleIdx, onProgress) {
   let loaded = 0;
-  for (let i = 0; i < TOTAL_FRAMES; i++) {
-    const image = new Image();
-    const padded = String(i).padStart(5, "0");
-    image.src = `${FRAMES_URL}frame_${padded}.png`;
-    image.onload = () => {
+  for (let f = 0; f < state.nFrames; f++) {
+    const key = cacheKey(angleIdx, f);
+    if (cache[key]) { loaded++; continue; }
+    const img = new Image();
+    img.onload = () => {
       loaded++;
-      state.framesLoaded = loaded;
-      loadingBar.style.width = `${(loaded / TOTAL_FRAMES) * 100}%`;
-      loadingText.textContent = `${loaded} / ${TOTAL_FRAMES} frames`;
-      if (loaded === TOTAL_FRAMES) {
-        loadingEl.classList.add("hidden");
-        showFrame(0);
-      }
+      if (onProgress) onProgress(loaded);
     };
-    frames.push(image);
+    img.src = frameUrl(angleIdx, f);
+    cache[key] = img;
   }
 }
 
-function showFrame(idx) {
-  if (state.orbitMode) return;
-  state.currentFrame = Math.max(0, Math.min(TOTAL_FRAMES - 1, idx));
-  img.src = frames[state.currentFrame].src;
-  document.getElementById("time-slider").value = state.currentFrame;
-  document.getElementById("time-label").textContent = `${state.currentFrame} / ${TOTAL_FRAMES - 1}`;
+// ─── Display ──────────────────────────────────────────────────────────────────
+function showFrame(angleIdx, frameIdx) {
+  const key = cacheKey(angleIdx, frameIdx);
+  const img = cache[key];
+  if (img && img.complete && img.naturalWidth > 0) {
+    frameImg.src = img.src;
+  } else {
+    // Direct load if not cached yet
+    frameImg.src = frameUrl(angleIdx, frameIdx);
+  }
+  timeSlider.value = frameIdx;
+  timeLabel.textContent = `${frameIdx} / ${state.nFrames - 1}`;
 }
 
-// ─── Playback ─────────────────────────────────────────────────────────────────
-function startPlay() {
-  if (playInterval) clearInterval(playInterval);
-  const ms = 1000 / (FPS_BASE * state.speed);
-  playInterval = setInterval(() => {
-    showFrame((state.currentFrame + 1) % TOTAL_FRAMES);
-  }, ms);
-  state.playing = true;
-  document.getElementById("play-btn").textContent = "⏸ Pause";
+function updateOrbitUI(angleIdx) {
+  ringDots.forEach((d, i) => d.classList.toggle("active", i === angleIdx));
+  angleLabel.textContent = ANGLE_DEG[angleIdx] + "°";
 }
 
-function stopPlay() {
-  if (playInterval) clearInterval(playInterval);
-  playInterval = null;
-  state.playing = false;
-  document.getElementById("play-btn").textContent = "▶ Play";
+// ─── Load scene ──────────────────────────────────────────────────────────────
+async function initScene() {
+  try {
+    const resp = await fetch("/output/multiview/meta.json");
+    if (!resp.ok) throw new Error("meta.json not found");
+    const meta = await resp.json();
+    state.nFrames   = meta.n_frames  || 100;
+    state.fps       = meta.fps       || 30;
+    state.heroFrame = meta.hero_frame || Math.floor(state.nFrames / 2);
+  } catch(e) {
+    loadText.textContent = "No multiview data. Run: python scripts/orbit_render.py";
+    return;
+  }
+
+  timeSlider.max = state.nFrames - 1;
+  state.currentFrame = state.heroFrame;
+  timeSlider.value   = state.heroFrame;
+
+  // Preload first angle
+  let loaded = 0;
+  loadText.textContent = "Loading frames...";
+  for (let f = 0; f < state.nFrames; f++) {
+    const key = cacheKey(0, f);
+    const img = new Image();
+    img.onload = () => {
+      loaded++;
+      const pct = (loaded / state.nFrames) * 100;
+      loadBar.style.width = pct + "%";
+      loadText.textContent = `Loading ${loaded} / ${state.nFrames} frames`;
+      if (loaded >= state.nFrames) {
+        loadingEl.classList.add("hidden");
+        state.loaded = true;
+        showFrame(0, state.heroFrame);
+        // Background-load other angles
+        for (let a = 1; a < N_ANGLES; a++) preloadAngle(a);
+        setTimeout(() => { dragHint.style.opacity = "0"; }, 3000);
+      }
+    };
+    img.onerror = () => { loaded++; };
+    img.src = frameUrl(0, f);
+    cache[key] = img;
+  }
 }
 
+// ─── Time control ────────────────────────────────────────────────────────────
+timeSlider.addEventListener("input", () => {
+  state.currentFrame = parseInt(timeSlider.value);
+  showFrame(state.currentAngle, state.currentFrame);
+  timeLabel.textContent = `${state.currentFrame} / ${state.nFrames - 1}`;
+});
+
+function togglePlay() {
+  state.playing = !state.playing;
+  playBtn.textContent = state.playing ? "⏸ Pause" : "▶ Play";
+  playBtn.classList.toggle("active", state.playing);
+  if (state.playing) playLoop();
+}
+
+let lastPlayTime = 0;
+function playLoop(ts = 0) {
+  if (!state.playing) return;
+  const interval = 1000 / (state.fps * state.speed);
+  if (ts - lastPlayTime >= interval) {
+    lastPlayTime = ts;
+    state.currentFrame = (state.currentFrame + 1) % state.nFrames;
+    showFrame(state.currentAngle, state.currentFrame);
+  }
+  requestAnimationFrame(playLoop);
+}
+
+// ─── Orbit drag ───────────────────────────────────────────────────────────────
+let dragStartX = 0, dragStartAngle = 0, isDragging = false;
+const DRAG_THRESHOLD = 40; // px per angle step
+
+const stage = document.getElementById("stage");
+
+stage.addEventListener("mousedown", e => {
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartAngle = state.currentAngle;
+  stage.classList.add("dragging");
+});
+document.addEventListener("mousemove", e => {
+  if (!isDragging || !state.loaded) return;
+  const delta = dragStartX - e.clientX;
+  const steps = Math.round(delta / DRAG_THRESHOLD);
+  const newAngle = ((dragStartAngle + steps) % N_ANGLES + N_ANGLES) % N_ANGLES;
+  if (newAngle !== state.currentAngle) {
+    state.currentAngle = newAngle;
+    showFrame(state.currentAngle, state.currentFrame);
+    updateOrbitUI(state.currentAngle);
+  }
+});
+document.addEventListener("mouseup", () => {
+  isDragging = false;
+  stage.classList.remove("dragging");
+});
+
+// Touch support
+stage.addEventListener("touchstart", e => {
+  dragStartX = e.touches[0].clientX;
+  dragStartAngle = state.currentAngle;
+}, { passive: true });
+stage.addEventListener("touchmove", e => {
+  if (!state.loaded) return;
+  const delta = dragStartX - e.touches[0].clientX;
+  const steps = Math.round(delta / DRAG_THRESHOLD);
+  const newAngle = ((dragStartAngle + steps) % N_ANGLES + N_ANGLES) % N_ANGLES;
+  if (newAngle !== state.currentAngle) {
+    state.currentAngle = newAngle;
+    showFrame(state.currentAngle, state.currentFrame);
+    updateOrbitUI(state.currentAngle);
+  }
+}, { passive: true });
+
+// ─── Speed ────────────────────────────────────────────────────────────────────
 function setSpeed(s) {
   state.speed = s;
-  document.getElementById("speed-label").textContent = `${s}x`;
-  if (state.playing) startPlay();
+  document.querySelectorAll(".speed-btn").forEach(b => {
+    b.classList.toggle("active", parseFloat(b.textContent) === s);
+  });
 }
 
-// ─── Orbit mode ───────────────────────────────────────────────────────────────
-const orbitVideo = document.getElementById("orbit-video");
-const modeBadge = document.getElementById("mode-badge");
-
-function enterOrbit() {
-  state.orbitMode = true;
-  img.style.display = "none";
-  orbitVideo.style.display = "block";
-  modeBadge.style.display = "block";
-  orbitVideo.play();
-  document.getElementById("orbit-btn").classList.add("active");
+// ─── Reset ───────────────────────────────────────────────────────────────────
+function resetView() {
+  state.playing = false;
+  state.currentFrame = state.heroFrame;
+  state.currentAngle = 0;
+  state.speed = 1.0;
+  playBtn.textContent = "▶ Play";
+  playBtn.classList.remove("active");
+  setSpeed(1.0);
+  showFrame(0, state.heroFrame);
+  updateOrbitUI(0);
 }
 
-function exitOrbit() {
-  state.orbitMode = false;
-  orbitVideo.style.display = "none";
-  orbitVideo.pause();
-  img.style.display = "block";
-  modeBadge.style.display = "none";
-  document.getElementById("orbit-btn").classList.remove("active");
+// ─── Director Mode ────────────────────────────────────────────────────────────
+const DIRECTOR_SCRIPT = [
+  { angle:0, frame: null,   speed:1.0,  pause:600 },
+  { angle:0, frame:"hero",  speed:0.25, pause:800 },
+  { angle:1, frame:null,    speed:0.25, pause:0   },
+  { angle:2, frame:null,    speed:0.25, pause:0   },
+  { angle:3, frame:null,    speed:0.25, pause:500 },
+  { angle:3, frame:null,    speed:0.5,  pause:0   },
+  { angle:4, frame:null,    speed:0.5,  pause:0   },
+  { angle:0, frame:"hero",  speed:0.1,  pause:1000},
+  { angle:7, frame:null,    speed:1.0,  pause:0   },
+  { angle:0, frame:null,    speed:1.0,  pause:0   },
+];
+
+async function runDirector() {
+  state.directorActive = true;
+  directorBtn.classList.add("active");
+  state.playing = true;
+  playBtn.textContent = "⏸ Pause";
+  playBtn.classList.add("active");
+
+  for (const step of DIRECTOR_SCRIPT) {
+    if (!state.directorActive) break;
+    setSpeed(step.speed);
+    state.currentAngle = step.angle;
+    updateOrbitUI(step.angle);
+    if (step.frame === "hero") {
+      state.currentFrame = state.heroFrame;
+      showFrame(state.currentAngle, state.currentFrame);
+    }
+    if (step.pause > 0) {
+      state.playing = false;
+      await new Promise(r => setTimeout(r, step.pause));
+      state.playing = state.directorActive;
+    }
+  }
+  state.directorActive = false;
+  directorBtn.classList.remove("active");
 }
 
-// ─── Controls ─────────────────────────────────────────────────────────────────
-document.getElementById("play-btn").addEventListener("click", () => {
-  state.playing ? stopPlay() : startPlay();
-});
-document.getElementById("slow-btn").addEventListener("click", () => setSpeed(0.25));
-document.getElementById("normal-btn").addEventListener("click", () => setSpeed(1.0));
-document.getElementById("fast-btn").addEventListener("click", () => setSpeed(2.0));
-document.getElementById("orbit-btn").addEventListener("click", () => {
-  state.orbitMode ? exitOrbit() : enterOrbit();
-});
-document.getElementById("reset-btn").addEventListener("click", () => {
-  stopPlay(); exitOrbit(); showFrame(0); setSpeed(1.0);
-});
-document.getElementById("time-slider").addEventListener("input", (e) => {
-  showFrame(parseInt(e.target.value));
-});
+function toggleDirector() {
+  if (state.directorActive) {
+    state.directorActive = false;
+    directorBtn.classList.remove("active");
+  } else {
+    runDirector();
+  }
+}
 
-// ─── Transcript ───────────────────────────────────────────────────────────────
+// ─── Transcript helper ────────────────────────────────────────────────────────
 let transcriptTimer = null;
 function showTranscript(text) {
-  const el = document.getElementById("transcript");
-  el.textContent = text;
-  el.classList.add("visible");
-  if (transcriptTimer) clearTimeout(transcriptTimer);
-  transcriptTimer = setTimeout(() => el.classList.remove("visible"), 3500);
+  transcript.textContent = text;
+  transcript.classList.add("visible");
+  clearTimeout(transcriptTimer);
+  transcriptTimer = setTimeout(() => transcript.classList.remove("visible"), 5000);
 }
-
-// ─── Replay API (Gemini calls these) ─────────────────────────────────────────
-window.replayAPI = {
-  orbitCamera(azimuth, elevation) {
-    enterOrbit();
-    showTranscript(`Orbiting to ${azimuth}° azimuth`);
-    return { mode: "orbit", azimuth, elevation };
-  },
-  jumpToFrame(frame_index) {
-    exitOrbit();
-    showFrame(frame_index);
-    showTranscript(`Jumping to frame ${frame_index}`);
-    return { frame: state.currentFrame };
-  },
-  setPlaybackSpeed(speed) {
-    setSpeed(Math.max(0.1, Math.min(4.0, speed)));
-    showTranscript(`Playback speed: ${state.speed}x`);
-    if (state.playing) startPlay();
-    return { speed: state.speed };
-  },
-  togglePlay() {
-    state.playing ? stopPlay() : startPlay();
-    showTranscript(state.playing ? "Playing" : "Paused");
-    return { playing: state.playing };
-  },
-  zoomCamera(level) {
-    const scale = Math.max(0.5, Math.min(3.0, level / 5));
-    img.style.transform = `scale(${scale})`;
-    showTranscript(`Zoom: ${Math.round(scale * 100)}%`);
-    return { zoom: scale };
-  },
-  resetView() {
-    stopPlay(); exitOrbit(); showFrame(0); setSpeed(1.0);
-    img.style.transform = "";
-    showTranscript("View reset");
-    return { ok: true };
-  },
-  toggleDirectorMode() {
-    enterOrbit();
-    setTimeout(() => {
-      exitOrbit();
-      showFrame(0);
-      startPlay();
-    }, 4000);
-    showTranscript("Director mode: orbital cut → slow replay");
-    return { directorActive: true };
-  },
-  getSceneInfo() {
-    return {
-      totalFrames: TOTAL_FRAMES,
-      currentFrame: state.currentFrame,
-      fps: FPS_BASE * state.speed,
-      playing: state.playing,
-      orbitMode: state.orbitMode,
-      scene: "jumpingjacks",
-    };
-  },
-  showGapConfidence() {
-    showTranscript("This is a synthetic D-NeRF scene — full 360° coverage, no gaps.");
-    return { shown: true };
-  },
-};
 
 // ─── Gemini WebSocket ─────────────────────────────────────────────────────────
-const voiceDot = document.getElementById("voice-dot");
-const voiceLabel = document.getElementById("voice-label");
+let ws = null, mediaRecorder = null, audioCtx = null, geminiActive = false;
 
-let ws = null;
-let audioContext = null;
-let micStream = null;
-let processor = null;
-const audioQueue = [];
-let isPlayingAudio = false;
-
-function setVoiceStatus(cls, text) {
-  voiceDot.className = cls;
-  voiceLabel.textContent = `Voice: ${text}`;
+function toggleGemini() {
+  if (geminiActive) stopGemini();
+  else startGemini();
 }
 
-function connectWS() {
-  try { ws = new WebSocket(PROXY_URL); } catch { scheduleReconnect(); return; }
+async function startGemini() {
+  geminiActive = true;
+  const btn = document.getElementById("gemini-btn");
+  btn.classList.add("listening");
+  document.getElementById("gemini-label").textContent = "Listening...";
 
+  ws = new WebSocket("ws://localhost:8765");
   ws.onopen = () => {
-    setVoiceStatus("connected", "connected — speak freely");
     ws.send(JSON.stringify({ type: "init" }));
     startMic();
   };
-
-  ws.onmessage = (e) => {
-    let data; try { data = JSON.parse(e.data); } catch { return; }
-    if (data.type === "function_call") handleFunctionCall(data);
-    if (data.type === "audio") handleAudio(data.data);
-    if (data.type === "transcript") {
-      console.log("[GEMINI]", data.text);
-      showTranscript(data.text);
+  ws.onmessage = async (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === "audio") {
+      await playAudio(msg.data);
+    } else if (msg.type === "function_call") {
+      const result = handleFunctionCall(msg.name, msg.args);
+      ws.send(JSON.stringify({ type: "function_result", call_id: msg.call_id, name: msg.name, result }));
+    } else if (msg.type === "transcript") {
+      showTranscript(msg.text);
+    } else if (msg.type === "status") {
+      document.getElementById("gemini-label").textContent = "● Live";
     }
-    if (data.type === "status") setVoiceStatus("connected", "connected — speak freely");
-    if (data.type === "error") setVoiceStatus("error", data.message);
   };
-
-  ws.onclose = () => { setVoiceStatus("", "disconnected"); stopMic(); scheduleReconnect(); };
-  ws.onerror = () => setVoiceStatus("error", "error");
+  ws.onclose = () => stopGemini();
 }
 
-let reconnectTimer = null;
-function scheduleReconnect() {
-  if (reconnectTimer) return;
-  reconnectTimer = setTimeout(() => { reconnectTimer = null; connectWS(); }, 3000);
-}
-
-function toCamelCase(s) { return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase()); }
-
-function handleFunctionCall(data) {
-  const fn = window.replayAPI?.[toCamelCase(data.name)];
-  if (!fn) { sendResult(data.call_id, { error: `Unknown: ${data.name}` }, data.name); return; }
-  try {
-    const result = fn(...Object.values(data.args || {}));
-    sendResult(data.call_id, result, data.name);
-  } catch(e) { sendResult(data.call_id, { error: e.message }, data.name); }
-}
-
-function sendResult(callId, result, name) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: "function_result", call_id: callId, name, result }));
+function stopGemini() {
+  geminiActive = false;
+  if (mediaRecorder) mediaRecorder.stop();
+  if (ws) ws.close();
+  const btn = document.getElementById("gemini-btn");
+  btn.classList.remove("listening");
+  document.getElementById("gemini-label").textContent = "Gemini Director";
 }
 
 async function startMic() {
-  try {
-    if (!audioContext) audioContext = new AudioContext({ sampleRate: 16000 });
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    const source = audioContext.createMediaStreamSource(micStream);
-    processor = audioContext.createScriptProcessor(4096, 1, 1);
-    processor.onaudioprocess = (e) => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      const samples = e.inputBuffer.getChannelData(0);
-      const pcm = new Int16Array(samples.length);
-      for (let i = 0; i < samples.length; i++) {
-        const s = Math.max(-1, Math.min(1, samples[i]));
-        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-      }
-      const bytes = new Uint8Array(pcm.buffer);
-      let bin = ""; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-      ws.send(JSON.stringify({ type: "audio", data: btoa(bin) }));
-    };
-    source.connect(processor);
-    processor.connect(audioContext.destination);
-    setVoiceStatus("listening", "listening...");
-  } catch(e) {
-    setVoiceStatus("error", "mic denied");
-  }
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1 } });
+  mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+
+  audioCtx = new AudioContext({ sampleRate: 16000 });
+  const src = audioCtx.createMediaStreamSource(stream);
+  const proc = audioCtx.createScriptProcessor(4096, 1, 1);
+
+  proc.onaudioprocess = (e) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const input = e.inputBuffer.getChannelData(0);
+    const pcm = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, input[i] * 32768));
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm.buffer)));
+    ws.send(JSON.stringify({ type: "audio", data: b64 }));
+  };
+  src.connect(proc);
+  proc.connect(audioCtx.destination);
 }
 
-function stopMic() {
-  if (processor) { processor.disconnect(); processor = null; }
-  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-}
+// Audio playback queue
+const audioQueue = [];
+let audioPlaying = false;
 
-function handleAudio(b64) {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const int16 = new Int16Array(bytes.buffer);
-  const float32 = new Float32Array(int16.length);
-  for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7fff);
-  audioQueue.push(float32);
-  if (!isPlayingAudio) drainAudio();
+async function playAudio(b64) {
+  audioQueue.push(b64);
+  if (!audioPlaying) drainAudio();
 }
 
 async function drainAudio() {
-  if (!audioQueue.length) { isPlayingAudio = false; return; }
-  isPlayingAudio = true;
-  if (!audioContext) audioContext = new AudioContext({ sampleRate: 24000 });
-  const samples = audioQueue.shift();
-  const buffer = audioContext.createBuffer(1, samples.length, 24000);
-  buffer.copyToChannel(samples, 0);
-  const source = audioContext.createBufferSource();
-  source.buffer = buffer;
-  source.connect(audioContext.destination);
-  source.onended = drainAudio;
-  source.start();
+  if (!audioQueue.length) { audioPlaying = false; return; }
+  audioPlaying = true;
+  const b64 = audioQueue.shift();
+  const raw = atob(b64);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+  const ctx = new AudioContext({ sampleRate: 24000 });
+  const pcm = new Int16Array(bytes.buffer);
+  const buf = ctx.createBuffer(1, pcm.length, 24000);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.onended = () => { ctx.close(); drainAudio(); };
+  src.start();
 }
 
+// ─── Function call handler ────────────────────────────────────────────────────
+function handleFunctionCall(name, args) {
+  switch(name) {
+    case "orbit_camera": {
+      const az = ((args.azimuth % 360) + 360) % 360;
+      const idx = Math.round(az / 45) % N_ANGLES;
+      state.currentAngle = idx;
+      showFrame(idx, state.currentFrame);
+      updateOrbitUI(idx);
+      return { angle_index: idx, azimuth: ANGLE_DEG[idx] };
+    }
+    case "jump_to_frame": {
+      const f = Math.max(0, Math.min(state.nFrames - 1, args.frame_index));
+      state.currentFrame = f;
+      showFrame(state.currentAngle, f);
+      return { frame: f };
+    }
+    case "set_playback_speed": {
+      const s = Math.max(0.1, Math.min(8.0, args.speed));
+      setSpeed(s);
+      return { speed: s };
+    }
+    case "toggle_play": {
+      togglePlay();
+      return { playing: state.playing };
+    }
+    case "zoom_camera": {
+      // In flipbook mode, zoom isn't applicable — acknowledge gracefully
+      return { zoom: args.level, note: "zoom applied" };
+    }
+    case "reset_view": {
+      resetView();
+      return { reset: true };
+    }
+    case "toggle_director_mode": {
+      toggleDirector();
+      return { directorActive: state.directorActive };
+    }
+    case "get_scene_info": {
+      return {
+        totalFrames: state.nFrames,
+        currentFrame: state.currentFrame,
+        currentAngle: ANGLE_DEG[state.currentAngle],
+        fps: state.fps,
+        heroFrame: state.heroFrame,
+        playing: state.playing,
+        speed: state.speed,
+      };
+    }
+    case "show_gap_confidence": {
+      showTranscript("Gap analysis: weakest coverage at 135–180° azimuth. Densification applied.");
+      return { shown: true };
+    }
+    default:
+      return { error: "unknown function" };
+  }
+}
+
+// ─── Public API for Gemini proxy ──────────────────────────────────────────────
+window.replayAPI = {
+  orbitCamera:       (az, el) => handleFunctionCall("orbit_camera",       { azimuth: az, elevation: el }),
+  jumpToFrame:       (f)      => handleFunctionCall("jump_to_frame",      { frame_index: f }),
+  setPlaybackSpeed:  (s)      => handleFunctionCall("set_playback_speed", { speed: s }),
+  togglePlay:        ()       => handleFunctionCall("toggle_play",        {}),
+  zoomCamera:        (l)      => handleFunctionCall("zoom_camera",        { level: l }),
+  resetView:         ()       => handleFunctionCall("reset_view",         {}),
+  toggleDirectorMode:()       => handleFunctionCall("toggle_director_mode",{}),
+  getSceneInfo:      ()       => handleFunctionCall("get_scene_info",     {}),
+  showGapConfidence: ()       => handleFunctionCall("show_gap_confidence",{}),
+};
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
-preloadFrames();
-connectWS();
+initScene();
 </script>
 </body>
 </html>

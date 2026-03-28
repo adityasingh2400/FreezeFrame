@@ -34,8 +34,9 @@ class ReplayHandler(http.server.SimpleHTTPRequestHandler):
         print(f"[HTTP] {self.address_string()} - {fmt % args}")
 
     def end_headers(self):
-        # CORS for local dev
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
         super().end_headers()
 
 
