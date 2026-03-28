@@ -1,0 +1,18 @@
+# base from 3dReal requirements.txt
+imageio
+numpy
+opencv-python-headless
+scipy
+
+# replaces instant-ngp (handles COLMAP + NeRF in one tool)
+nerfstudio
+
+# NEW: Gemini
+google-generativeai
+
+# video processing — from 3dReal
+moviepy
+ffmpeg-python
+
+# Firebase
+firebase-admin
