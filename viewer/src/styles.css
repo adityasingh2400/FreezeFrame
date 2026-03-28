@@ -45,21 +45,7 @@
   box-sizing: border-box;
 }
 
-/* ── Scanline texture (DESIGN.md: "Suggests scientific instrumentation") ── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(255, 255, 255, 0.015) 2px,
-    rgba(255, 255, 255, 0.015) 4px
-  );
-  pointer-events: none;
-  z-index: 9999;
-}
+/* Scanline texture removed — interferes with image viewing */
 
 body {
   overflow: hidden;
@@ -590,6 +576,284 @@ kbd {
   gap: var(--space-md);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
+}
+
+/* ── Bullet-Time Mode ── */
+
+/* Hide splat-only controls in bullet-time mode */
+.bullet-time-mode #playback-controls,
+.bullet-time-mode #timeline-container,
+.bullet-time-mode #speed-control,
+.bullet-time-mode #camera-presets,
+.bullet-time-mode #director-btn,
+.bullet-time-mode #orbit-hint,
+.bullet-time-mode #splat-counter {
+  display: none !important;
+}
+
+/* Moment label — top center, big and cinematic */
+#bt-moment-label {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  pointer-events: none;
+}
+
+#bt-moment-desc {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  pointer-events: none;
+  max-width: 400px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Drag hint — same position as orbit hint */
+#bt-drag-hint {
+  position: absolute;
+  bottom: 72px;
+  left: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+#bt-drag-hint span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(107, 107, 122, 0.7);
+}
+
+/* Angle indicator — thin bar at bottom of controls */
+#bt-angle-indicator {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#bt-angle-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(to right, var(--cyan), var(--orange));
+  border-radius: 1px;
+  transition: width 0.05s ease-out;
+}
+
+/* ── Source Badge (real vs AI-generated) ── */
+#bt-source-badge {
+  position: absolute;
+  top: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 3px 12px;
+  border-radius: 9999px;
+  pointer-events: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+#bt-source-badge.source-real {
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+#bt-source-badge.source-synth {
+  color: var(--orange);
+  background: var(--orange-dim);
+  border: 1px solid rgba(255, 107, 53, 0.25);
+}
+
+/* Show Gemini chat in bullet-time mode */
+.bullet-time-mode #gemini-chat {
+  display: flex !important;
+}
+
+/* ── Gemini Live Chat Panel ── */
+#gemini-chat {
+  position: absolute;
+  bottom: 50px;
+  right: var(--space-lg);
+  width: 320px;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(13, 13, 20, 0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  overflow: hidden;
+  z-index: 20;
+}
+
+#gemini-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.gemini-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.gemini-dot.connected { background: var(--success); }
+.gemini-dot.disconnected { background: var(--text-dim); }
+.gemini-dot.error { background: var(--error); }
+.gemini-dot.working { background: var(--orange); animation: pulse 1s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+#gemini-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 80px;
+  max-height: 220px;
+}
+
+.gemini-msg {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  max-width: 90%;
+  word-wrap: break-word;
+}
+
+.gemini-msg-user {
+  background: var(--cyan-dim);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: var(--text);
+  align-self: flex-end;
+}
+
+.gemini-msg-assistant {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  align-self: flex-start;
+}
+
+.gemini-msg-status {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  align-self: center;
+  padding: 2px 0;
+}
+
+.gemini-msg-error {
+  color: var(--error);
+  font-size: 11px;
+}
+
+#gemini-input-row {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+#gemini-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+}
+
+#gemini-input:focus {
+  border-color: var(--cyan);
+}
+
+#gemini-input::placeholder {
+  color: var(--text-dim);
+}
+
+#gemini-send {
+  width: 32px;
+  height: 32px;
+  background: var(--cyan-dim);
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  border-radius: var(--radius-md);
+  color: var(--cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+#gemini-send:hover {
+  background: rgba(0, 212, 255, 0.2);
+}
+
+/* In bullet-time mode, restyle the frame counter label */
+.bullet-time-mode #frame-label {
+  color: var(--cyan);
+}
+
+.bullet-time-mode #frame-counter {
+  color: var(--cyan);
 }
 
 /* ── Responsive ── */

@@ -23,6 +23,9 @@ plyfile
 websockets
 google-genai
 
+# Bullet-time pipeline
+pydantic
+
 # Shared
 pyyaml
 python-dotenv

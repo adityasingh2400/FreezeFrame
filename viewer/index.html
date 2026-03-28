@@ -56,12 +56,25 @@
       </div>
     </div>
 
-    <!-- Orbit hint -->
+    <!-- Orbit hint (splat mode) -->
     <div id="orbit-hint" aria-label="Controls: drag to orbit, scroll to zoom">
       <span><kbd>drag</kbd> Orbit</span>
       <span><kbd>scroll</kbd> Zoom</span>
       <span><kbd>shift+drag</kbd> Pan</span>
       <span><kbd>D</kbd> Director</span>
+    </div>
+
+    <!-- Bullet-Time overlays -->
+    <div id="bt-moment-label" class="bt-only" style="display:none"></div>
+    <div id="bt-moment-desc" class="bt-only" style="display:none"></div>
+    <div id="bt-source-badge" class="bt-only" style="display:none"></div>
+    <div id="bt-drag-hint" class="bt-only" style="display:none">
+      <span><kbd>drag</kbd> Rotate</span>
+      <span><kbd>scroll</kbd> Step</span>
+      <span><kbd>&larr; &rarr;</kbd> Step</span>
+    </div>
+    <div id="bt-angle-indicator" class="bt-only" style="display:none">
+      <div id="bt-angle-fill"></div>
     </div>
 
     <!-- Controls Bar -->
@@ -98,8 +111,24 @@
       <span id="fps-counter"></span>
       <span id="splat-counter"></span>
     </div>
+
+    <!-- Gemini Live Chat Panel -->
+    <div id="gemini-chat" class="bt-only" style="display:none">
+      <div id="gemini-chat-header">
+        <span id="gemini-status-dot" class="gemini-dot disconnected"></span>
+        <span id="gemini-status-label">Disconnected</span>
+      </div>
+      <div id="gemini-messages"></div>
+      <div id="gemini-input-row">
+        <input type="text" id="gemini-input" placeholder="Ask about any moment..." autocomplete="off" />
+        <button id="gemini-send" aria-label="Send">
+          <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor"><path d="M2 10l7-7v4h9v6h-9v4z" transform="rotate(-90 10 10)"/></svg>
+        </button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>
+  <script src="/gemini_live.js" defer></script>
 </body>
 </html>
