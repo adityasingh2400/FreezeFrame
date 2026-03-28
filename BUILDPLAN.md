@@ -38,7 +38,9 @@ iOS app listener fires → plays orbit.mp4
 - `ios/Podfile` — copy from 3dReal, add WebKit pod
 
 ### Steps
-- 0:00 Clone 3dReal, swap Firebase config (GoogleService-Info.plist)
+- 0:00 Clone 3dReal, open in Xcode
+  - Drop in `GoogleService-Info.plist` from your Firebase project (Project Settings → iOS app)
+  - Update bundle ID in Xcode (Signing & Capabilities) to match your provisioning profile
 - 0:15 Get camera recording + upload working (already works in 3dReal)
 - 0:30 Add Firestore listener for result (see ViewController.swift `// NEW` sections)
 - 1:00 Add result screen (AVPlayerViewController for orbit video)
@@ -60,7 +62,10 @@ iOS app listener fires → plays orbit.mp4
 
 ### Steps
 - 0:00 SSH into RunPod, `pip install nerfstudio google-generativeai` (runs in background ~5 min)
-- 0:15 Copy server.py to RunPod, add your Firebase service account + Gemini API key
+- 0:15 Copy server.py to RunPod
+  - Drop in `serviceAccountKey.json` (Firebase Console → Project Settings → Service Accounts → Generate new key)
+  - Update bucket name in server.py line 23 to your Firebase Storage bucket
+  - `export GEMINI_API_KEY=your_key`
 - 0:30 Test Gemini peak moment function on a sample video
 - 0:45 **START PRE-RUN**: run full pipeline on a pre-recorded sports clip now (takes ~15 min on A100)
 - 1:00 Test nerfstudio render output
