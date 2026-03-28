@@ -1,0 +1,53 @@
+scene_dir: "scene"
+output_dir: "output"
+viewer_dir: "viewer"
+
+stage1:
+  raw_videos_dir: "scene/raw_videos"
+  synced_videos_dir: "scene/synced_videos"
+  images_dir: "scene/images"
+  metadata_path: "scene/metadata.json"
+  target_fps: 30
+  target_resolution: [1920, 1080]
+
+stage2:
+  images_dir: "scene/images"
+  sparse_dir: "scene/sparse/0"
+  poses_bounds_path: "scene/poses_bounds.npy"
+
+stage3:
+  data_format: "auto"
+  # auto: tries COLMAP path first (checks sparse/0/ for cameras.bin, images.bin, points3D.bin).
+  # Falls back to LLFF path (checks poses_bounds.npy).
+  # Exits with error if neither exists.
+  #
+  # 4DGS invocation per path:
+  #   COLMAP: python train.py -s scene/ --source_type colmap
+  #   DyNeRF: python train.py -s scene/ --source_type n3d
+  checkpoint_dir: "output/checkpoints"
+  export_dir: "output/frames"
+  output_meta_path: "output/output_meta.json"
+  training_iterations: 10000
+  resolution_scale: 2
+  max_export_frames: 50
+
+stage4:
+  viewer_dir: "viewer"
+  frames_dir: "output/frames"
+  preload_window: 5
+  demo_scene_url: "https://huggingface.co/cakewalk/splat-data/resolve/main/nike.splat"
+
+stage5:
+  gaps_dir: "gaps"
+  gap_map_path: "gaps/gap_map.json"
+  anchor_views_dir: "gaps/anchor_views"
+  repaired_views_dir: "gaps/repaired_views"
+
+gemini:
+  proxy_port: 8765
+  model: "gemini-2.0-flash-live-001"
+
+cloud:
+  host: "TBD"
+  workspace: "/workspace/replay"
+  gpu: "A100"

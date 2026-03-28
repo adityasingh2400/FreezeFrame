@@ -1,0 +1,46 @@
+# Data files (too large for git)
+scene/raw_videos/*.mp4
+scene/raw_videos/*.mov
+scene/raw_videos/*.MOV
+scene/synced_videos/*.mp4
+scene/images/cam*/*.png
+scene/sparse/0/*.bin
+scene/poses_bounds.npy
+scene/metadata.json
+
+# Training output
+output/checkpoints/
+output/frames/*.ply
+output/frames/*.splat
+output/output_meta.json
+
+# Gap repair (post-MVP)
+gaps/gap_map.json
+gaps/gap_meta.json
+gaps/anchor_views/*.png
+gaps/repaired_views/*.png
+
+# Environment
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# SSH / credentials
+.ssh/
+*.pem
+*.key
+
+# Keep gitkeep files
+!.gitkeep
