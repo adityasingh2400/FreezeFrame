@@ -60,7 +60,7 @@ def check_prerequisites():
         errors.append(f"train.py not found at {train_py}")
 
     try:
-        subprocess.run(["python", "-c", "import torch; assert torch.cuda.is_available()"],
+        subprocess.run([sys.executable, "-c", "import torch; assert torch.cuda.is_available()"],
                        capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         errors.append("PyTorch with CUDA not available (torch.cuda.is_available() == False)")
@@ -148,7 +148,7 @@ def train(config, port=DEFAULT_PORT):
 
     start = time.time()
     run_cmd([
-        "python", "train.py",
+        sys.executable, "train.py",
         "-s", "data/multipleview/replay",
         "--port", str(port),
         "--expname", "multipleview/replay",
@@ -173,7 +173,7 @@ def render_video(config):
         return
 
     run_cmd([
-        "python", "render.py",
+        sys.executable, "render.py",
         "--model_path", str(model_path),
         "--skip_train",
         "--configs", config,
@@ -221,7 +221,7 @@ def export_perframe(config, iteration):
 
     model_path = FOURDGS_DIR / "output" / "multipleview" / "replay"
     run_cmd([
-        "python", "export_perframe_3DGS.py",
+        sys.executable, "export_perframe_3DGS.py",
         "--iteration", str(iteration),
         "--configs", config,
         "--model_path", str(model_path),
