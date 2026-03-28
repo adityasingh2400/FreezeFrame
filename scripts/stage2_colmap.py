@@ -223,7 +223,7 @@ def convert_colmap_to_llff(reconstruction, output_path: Path):
 
     # Compute scene bounds from sparse point cloud for near/far
     if points:
-        pts_world = np.array([p.xyz for p in points.values()])  # (N, 3)
+        pts_world = np.array([p.xyz for p in points.values()], dtype=np.float64)  # (N, 3)
     else:
         pts_world = np.zeros((1, 3))
 
@@ -232,13 +232,15 @@ def convert_colmap_to_llff(reconstruction, output_path: Path):
         cam = cameras[image.camera_id]
 
         # Extrinsics: world-to-camera → invert to camera-to-world
-        R_w2c = image.rotation_matrix()          # (3, 3)
-        t_w2c = image.tvec                        # (3,)
+        # pycolmap 4.x API: image.cam_from_world() returns a Rigid3d
+        cfw = image.cam_from_world()
+        R_w2c = cfw.rotation.matrix()            # (3, 3)
+        t_w2c = cfw.translation                  # (3,)
         R_c2w = R_w2c.T
         t_c2w = -R_c2w @ t_w2c                   # camera center in world
 
-        # Intrinsics: focal length (assume SIMPLE_RADIAL or PINHOLE)
-        focal = cam.focal_length if hasattr(cam, "focal_length") else cam.params[0]
+        # Intrinsics: focal length (pycolmap 4.x exposes focal_length directly)
+        focal = cam.focal_length
         h, w = cam.height, cam.width
 
         # LLFF convention: swap y/z axes (OpenCV → OpenGL/NeRF convention)
