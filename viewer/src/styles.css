@@ -69,13 +69,19 @@ body {
 }
 
 #landing-logo {
-  width: 360px;
+  width: 400px;
   height: auto;
+  animation: logo-float 4s ease-in-out infinite;
+}
+
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
 }
 
 #landing-wordmark {
   font-family: var(--font-mono);
-  font-size: 32px;
+  font-size: 44px;
   font-weight: 600;
   letter-spacing: 0.38em;
   color: var(--maroon);
