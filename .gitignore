@@ -70,3 +70,4 @@ viewer/public/precomputed
 # Keep gitkeep files
 !.gitkeep
 .gstack/
+.vercel

@@ -369,7 +369,14 @@ TOOLS AVAILABLE:
 - step_frame — step forward/back by N frames
 - highlight_moment — jump to frame with label overlay, no animation
 
-Keep responses tight. Every word counts. Make them feel something."""
+Keep responses tight. Every word counts. Make them feel something.
+
+CRITICAL RULE — STAY ON SCREEN:
+- ONLY comment on what is visible on screen or what the user directly asked about.
+- NEVER comment on the user's thought process, intentions, emotions, or personality.
+- NEVER say things like "great question", "I love that you noticed", "you're thinking about".
+- Just answer directly. If they ask about the kick, talk about the kick. Nothing else.
+- No filler, no compliments, no meta-commentary about the user. Pure content."""
 
 
 # ── Tool Execution ─────────────────────────────────────────────────────

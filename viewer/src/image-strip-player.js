@@ -272,6 +272,7 @@ export class ImageStripPlayer {
 
   /**
    * Entry animation: sweep forward 0→end, pause, then reverse end→0.
+   * No duplicate frames at the boundaries.
    */
   playForwardReverse(fps = 24, pauseMs = 400) {
     return new Promise((resolve) => {
@@ -280,16 +281,19 @@ export class ImageStripPlayer {
       const total = this._totalFrames;
       if (total < 2) { resolve(); return; }
 
-      const forward = [];
-      for (let f = 0; f < total; f++) forward.push(f);
-      const reverse = [];
-      for (let f = total - 1; f >= 0; f--) reverse.push(f);
-
+      const last = total - 1;
       const delay = 1000 / fps;
       let phase = 'forward';
-      let idx = 0;
+      let frame = 0;
       let lastTime = null;
       let pauseStart = null;
+
+      const showFrame = (f) => {
+        this._currentFrame = f;
+        const tex = this._textures[f];
+        if (tex) { this._material.map = tex; this._material.needsUpdate = true; }
+        if (this._onFrameChange) this._onFrameChange(f);
+      };
 
       const step = (ts) => {
         if (lastTime === null) lastTime = ts;
@@ -297,7 +301,7 @@ export class ImageStripPlayer {
         if (phase === 'pause') {
           if (ts - pauseStart >= pauseMs) {
             phase = 'reverse';
-            idx = 0;
+            frame = last - 1;
             lastTime = ts;
           }
           this._boomerangRaf = requestAnimationFrame(step);
@@ -305,24 +309,23 @@ export class ImageStripPlayer {
         }
 
         if (ts - lastTime >= delay) {
-          const seq = phase === 'forward' ? forward : reverse;
-          const frame = seq[idx];
-          this._currentFrame = frame;
-          const tex = this._textures[frame];
-          if (tex) { this._material.map = tex; this._material.needsUpdate = true; }
-          if (this._onFrameChange) this._onFrameChange(frame);
-          idx++;
+          showFrame(frame);
           lastTime = ts;
 
-          if (idx >= seq.length) {
-            if (phase === 'forward') {
+          if (phase === 'forward') {
+            if (frame >= last) {
               phase = 'pause';
               pauseStart = ts;
             } else {
+              frame++;
+            }
+          } else {
+            if (frame <= 0) {
               this._boomerangRaf = null;
               resolve();
               return;
             }
+            frame--;
           }
         }
 
