@@ -11,12 +11,12 @@ import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
 
 // ── Firebase config — fill these in (Firebase Console → Project Settings → Web app) ──
 const FIREBASE_CONFIG = {
-  apiKey:            "REPLACE_ME",
-  authDomain:        "REPLACE_ME",
-  projectId:         "REPLACE_ME",
-  storageBucket:     "REPLACE_ME",
-  messagingSenderId: "REPLACE_ME",
-  appId:             "REPLACE_ME",
+  apiKey:            "AIzaSyB78l1biBYrHiIcVMwTkUdhvZ0T5wBSzO8",
+  authDomain:        "replay-5ce56.firebaseapp.com",
+  projectId:         "replay-5ce56",
+  storageBucket:     "replay-5ce56.firebasestorage.app",
+  messagingSenderId: "770938583444",
+  appId:             "1:770938583444:web:144f3a11ff801ddceff781",
 };
 
 const firebaseApp = initializeApp(FIREBASE_CONFIG);

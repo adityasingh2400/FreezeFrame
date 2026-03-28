@@ -23,7 +23,7 @@ import cv2
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()                        # NEW: Firestore client for writing results
-bucket = storage.bucket("YOUR_BUCKET.appspot.com")
+bucket = storage.bucket("replay-5ce56.firebasestorage.app")
 
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])  # NEW
 
