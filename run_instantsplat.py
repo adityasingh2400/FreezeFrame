@@ -26,7 +26,9 @@ import time
 from pathlib import Path
 
 GS_TRAIN_ITER = 500
+GS_TRAIN_ITER_MAX = 7000
 TIMEOUT_SECONDS = 600
+TIMEOUT_SECONDS_MAX = 1800
 
 
 def find_output_ply(model_path):
@@ -56,7 +58,7 @@ def find_output_ply(model_path):
     return None
 
 
-def run_timestep(instantsplat_dir, timestep_dir, output_ply_path, gpu_id=0, train_iter=GS_TRAIN_ITER):
+def run_timestep(instantsplat_dir, timestep_dir, output_ply_path, gpu_id=0, train_iter=GS_TRAIN_ITER, timeout=TIMEOUT_SECONDS):
     """Run InstantSplat on a single timestep folder.
 
     Follows the exact same steps as scripts/run_infer.sh:
@@ -107,7 +109,7 @@ def run_timestep(instantsplat_dir, timestep_dir, output_ply_path, gpu_id=0, trai
             env=env,
             capture_output=True,
             text=True,
-            timeout=TIMEOUT_SECONDS,
+            timeout=timeout,
         )
         if result.returncode != 0:
             stderr_tail = (result.stderr or "")[-800:]
@@ -132,6 +134,15 @@ def run_timestep(instantsplat_dir, timestep_dir, output_ply_path, gpu_id=0, trai
         "--optim_pose",
     ]
 
+    # Max quality: ensure densification runs long enough for high iteration counts
+    if train_iter >= 3000:
+        train_cmd += [
+            "--densify_from_iter", "500",
+            "--densify_until_iter", str(int(train_iter * 0.85)),
+            "--densification_interval", "100",
+            "--opacity_reset_interval", "3000",
+        ]
+
     try:
         result = subprocess.run(
             train_cmd,
@@ -139,7 +150,7 @@ def run_timestep(instantsplat_dir, timestep_dir, output_ply_path, gpu_id=0, trai
             env=env,
             capture_output=True,
             text=True,
-            timeout=TIMEOUT_SECONDS,
+            timeout=timeout,
         )
         if result.returncode != 0:
             stderr_tail = (result.stderr or "")[-800:]
@@ -173,7 +184,7 @@ def run_timestep(instantsplat_dir, timestep_dir, output_ply_path, gpu_id=0, trai
 
 
 def run_all(input_dir, output_dir, instantsplat_dir, gpu_id=0, start=1, end=None,
-            skip_existing=True, train_iter=GS_TRAIN_ITER):
+            skip_existing=True, train_iter=GS_TRAIN_ITER, timeout=TIMEOUT_SECONDS):
     input_dir = Path(input_dir)
     output_dir = Path(output_dir)
     instantsplat_dir = Path(instantsplat_dir)
@@ -226,7 +237,7 @@ def run_all(input_dir, output_dir, instantsplat_dir, gpu_id=0, start=1, end=None
         print(f"[{ts_num:3d}/{end}] {ts_dir.name}... ", end="", flush=True)
         step_start = time.time()
 
-        if run_timestep(instantsplat_dir, ts_dir, out_path, gpu_id, train_iter):
+        if run_timestep(instantsplat_dir, ts_dir, out_path, gpu_id, train_iter, timeout):
             succeeded += 1
             step_elapsed = time.time() - step_start
             print(f" ({step_elapsed:.1f}s){eta}")
@@ -265,9 +276,18 @@ def main():
                         help="Last timestep to process (default: all)")
     parser.add_argument("--train-iter", type=int, default=GS_TRAIN_ITER,
                         help=f"Gaussian training iterations per timestep (default: {GS_TRAIN_ITER})")
+    parser.add_argument("--max-quality", action="store_true",
+                        help="Max quality: 7000 iterations, full densification, 30min timeout")
     parser.add_argument("--no-skip", action="store_true",
                         help="Re-process even if output PLY already exists")
     args = parser.parse_args()
+
+    train_iter = args.train_iter
+    if args.max_quality:
+        train_iter = GS_TRAIN_ITER_MAX
+        print(f"[MAX QUALITY] {train_iter} iters, timeout {TIMEOUT_SECONDS_MAX}s")
+
+    timeout = TIMEOUT_SECONDS_MAX if args.max_quality else TIMEOUT_SECONDS
 
     run_all(
         input_dir=args.input,
@@ -277,7 +297,8 @@ def main():
         start=args.start,
         end=args.end,
         skip_existing=not args.no_skip,
-        train_iter=args.train_iter,
+        train_iter=train_iter,
+        timeout=timeout,
     )
 
 
