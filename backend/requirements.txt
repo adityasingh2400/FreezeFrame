@@ -16,3 +16,6 @@ ffmpeg-python
 
 # Firebase
 firebase-admin
+
+# Env vars
+python-dotenv

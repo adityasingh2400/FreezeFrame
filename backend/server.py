@@ -10,6 +10,9 @@ import subprocess
 import glob
 import base64
 
+from dotenv import load_dotenv
+load_dotenv()  # loads .env from current directory
+
 import firebase_admin
 from firebase_admin import credentials, storage, firestore
 from moviepy.editor import VideoFileClip, concatenate_videoclips
