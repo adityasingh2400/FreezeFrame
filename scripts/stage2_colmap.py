@@ -58,23 +58,31 @@ def collect_images_for_colmap(images_dir: Path, strategy: str = "one_per_cam") -
         print(f"FAIL: no cam* directories found in {images_dir}")
         sys.exit(1)
 
+    def get_frames(cam_dir: Path) -> list[Path]:
+        frames = sorted(cam_dir.glob("frame_*.png")) or sorted(cam_dir.glob("frame_*.jpg"))
+        return frames
+
     images = []
     if strategy == "one_per_cam":
         for cam_dir in cam_dirs:
-            frames = sorted(cam_dir.glob("frame_*.png"))
+            frames = get_frames(cam_dir)
             if not frames:
                 print(f"FAIL: no frames in {cam_dir}")
                 sys.exit(1)
             images.append(frames[0])
     else:  # "all"
         for cam_dir in cam_dirs:
-            images.extend(sorted(cam_dir.glob("frame_*.png")))
+            images.extend(get_frames(cam_dir))
 
     print(f"  Collected {len(images)} images ({strategy} strategy)")
     return images
 
 
 def find_colmap_bin() -> str:
+    # Headless servers have no display — tell Qt to use offscreen rendering
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
     """Find the COLMAP binary, checking common install locations."""
     candidates = [
         shutil.which("colmap"),          # on PATH
