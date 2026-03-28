@@ -15,7 +15,7 @@ load_dotenv()  # loads .env from current directory
 
 import firebase_admin
 from firebase_admin import credentials, storage, firestore
-from moviepy.editor import VideoFileClip, concatenate_videoclips
+from moviepy import VideoFileClip, concatenate_videoclips
 
 # NEW: Gemini
 import google.generativeai as genai
