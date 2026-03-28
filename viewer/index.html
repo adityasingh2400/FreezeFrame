@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replay — 4D Sports Replay Engine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0a; color: #fff; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+        #canvas-container { width: 100vw; height: 100vh; position: relative; }
+        canvas { width: 100%; height: 100%; display: block; }
+
+        #controls {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(12px);
+            padding: 12px 24px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #time-slider {
+            width: 300px;
+            accent-color: #4af;
+        }
+
+        #frame-label {
+            font-size: 13px;
+            color: #aaa;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+        .btn:hover { background: rgba(255,255,255,0.2); }
+
+        #voice-status {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(12px);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        #voice-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #555;
+        }
+        #voice-dot.connected { background: #4f4; }
+        #voice-dot.error { background: #f44; }
+
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #888;
+        }
+        #loading.hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <canvas id="scene-canvas"></canvas>
+
+        <div id="loading">
+            <p style="font-size: 18px; margin-bottom: 8px;">Loading scene...</p>
+            <p id="loading-detail" style="font-size: 13px;">Waiting for .ply/.splat files in output/frames/</p>
+        </div>
+
+        <div id="controls">
+            <button class="btn" id="play-btn">Play</button>
+            <input type="range" id="time-slider" min="0" max="0" value="0" step="1">
+            <span id="frame-label">0 / 0</span>
+            <button class="btn" id="reset-btn">Reset</button>
+        </div>
+
+        <div id="voice-status">
+            <div id="voice-dot"></div>
+            <span id="voice-label">Voice: disconnected</span>
+        </div>
+    </div>
+
+    <script type="module" src="viewer.js"></script>
+    <script type="module" src="gemini_live.js"></script>
+</body>
+</html>

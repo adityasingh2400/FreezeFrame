@@ -1,0 +1,29 @@
+# Stage 1: Sync + Preprocessing
+numpy
+scipy
+opencv-python
+Pillow
+
+# Stage 2: COLMAP
+# COLMAP itself is installed via apt (not pip)
+# pip deps for LLFF conversion:
+# numpy (already above)
+
+# Stage 3: 4DGaussians
+# 4DGS has its own requirements — install separately in the 4DGS repo clone
+# This file covers the wrapper scripts only
+torch
+torchvision
+plyfile
+
+# Stage 4: Viewer
+# Viewer is pure HTML/JS — no pip deps
+
+# Server: Gemini Live proxy
+websockets
+google-genai
+
+# Shared
+pyyaml
+python-dotenv
+requests
