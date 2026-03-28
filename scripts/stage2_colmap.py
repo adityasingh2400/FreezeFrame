@@ -131,7 +131,7 @@ def run_colmap_matching(database_path: Path):
     cmd = [
         colmap_bin, "exhaustive_matcher",
         "--database_path", str(database_path),
-        "--SiftMatching.use_gpu", "0",
+        "--SiftMatching.use_gpu", "1",
     ]
     result = subprocess.run(cmd)
     if result.returncode != 0:
