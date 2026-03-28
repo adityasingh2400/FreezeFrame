@@ -19,6 +19,10 @@ sync:
 colmap:
 	$(PYTHON) scripts/stage2_colmap.py
 
+colmap-sparse:
+	$(PYTHON) scripts/stage2_colmap.py --sparse-only
+
+
 train:
 	$(PYTHON) scripts/stage3_4dgs.py
 
