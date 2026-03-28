@@ -95,18 +95,19 @@ fi
 PIP_FLAGS="--break-system-packages --no-deps"
 PIP_FLAGS_FULL="--break-system-packages"
 
-pip install -q $PIP_FLAGS_FULL plyfile lpips pytorch_msssim "imageio[ffmpeg]" scikit-image matplotlib tqdm opencv-python-headless 2>&1 | tail -5 || {
-    warn "Bulk install had issues, trying one by one..."
-    for pkg in plyfile lpips pytorch_msssim "imageio[ffmpeg]" scikit-image matplotlib tqdm opencv-python-headless; do
-        pip install -q --break-system-packages "$pkg" 2>/dev/null || \
-        pip install -q --break-system-packages --ignore-installed "$pkg" 2>/dev/null || \
-        warn "Failed to install $pkg"
-    done
-}
+# Install deps WITHOUT touching torch — use --no-deps first, then fill in missing deps
+TORCH_ORIG=$(python3 -c "import torch; print(torch.__version__)")
+pip install -q $PIP_FLAGS_FULL --no-deps plyfile lpips pytorch_msssim "imageio[ffmpeg]" scikit-image matplotlib tqdm opencv-python-headless 2>&1 | tail -3
+# Now install their sub-deps but exclude torch/torchvision
+pip install -q $PIP_FLAGS_FULL numpy scipy Pillow 2>&1 | tail -2
 
-# Verify torch wasn't clobbered by a dependency
+# Force restore original torch if something clobbered it
 TORCH_AFTER=$(python3 -c "import torch; print(torch.__version__)" 2>/dev/null)
-log "Torch after installs: $TORCH_AFTER"
+if [ "$TORCH_AFTER" != "$TORCH_ORIG" ]; then
+    warn "Torch was changed $TORCH_ORIG -> $TORCH_AFTER, restoring..."
+    pip install -q $PIP_FLAGS_FULL "torch==$TORCH_ORIG" --index-url https://download.pytorch.org/whl/cu128 2>&1 | tail -2
+fi
+log "Torch version: $(python3 -c 'import torch; print(torch.__version__)')"
 
 TORCH_SHORT=$(python3 -c "import torch; v=torch.__version__.split('+')[0].rsplit('.',1)[0]; print(v)")
 CUDA_SHORT=$(python3 -c "import torch; print(torch.version.cuda.replace('.','')[:3])")
