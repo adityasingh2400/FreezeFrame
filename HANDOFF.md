@@ -71,53 +71,65 @@ Root causes identified and fixed:
 
 ## WHAT NEEDS TO HAPPEN RIGHT NOW
 
-### 1. Push fixes to GitHub
+### NEW APPROACH: InstantSplat Pipeline (branch: `instantsplat-pipeline`)
+
+The old COLMAP → 4DGS pipeline used only 0.9% of spatial data (3 static viewpoints from 320 images). We're replacing it with **InstantSplat** (NVIDIA), which uses MASt3R for pose estimation + Gaussian Splatting — no COLMAP needed.
+
+**How it works:** For each of the 80 timesteps, take all 4 camera images → run InstantSplat → get a 3D Gaussian PLY. 80 PLY files = 4D animation.
+
+### 1. Push InstantSplat branch to GitHub
 ```bash
 cd /Users/aditya/Desktop/Replay
-git add restructure_for_4dgs.py 4DGaussians/scene/multipleview_dataset.py 4DGaussians/export_perframe_3DGS.py
-git commit -m "Fix training pipeline: dense init, cam01 filtering, 80-frame export"
-git push
+git checkout instantsplat-pipeline
+git add -A
+git commit -m "Add InstantSplat per-timestep pipeline (replaces COLMAP+4DGS)"
+git push -u origin instantsplat-pipeline
 ```
 
-### 2. On RunPod (or wherever training runs)
+### 2. On RunPod: Setup
 ```bash
-# Pull latest
-cd /workspace/Replay && git pull
-
-# Re-run restructure with dense data
-python3 restructure_for_4dgs.py
-
-# Train (quality)
-cd 4DGaussians
-python3 train.py -s data/multipleview/replay --port 6018 --expname "multipleview/replay" --configs arguments/multipleview/replay.py
-
-# Export ALL 80 frames (not 9!)
-python3 export_perframe_3DGS.py --iteration 14000 --configs arguments/multipleview/replay.py --model_path output/multipleview/replay --num_frames 80
+cd /workspace
+git clone https://github.com/adityasingh2400/Replay.git
+cd Replay && git checkout instantsplat-pipeline
+bash setup_instantsplat.sh
 ```
 
-### 3. IMPORTANT: Frame Images
-The frame JPGs (scene/images/cam01-04/) are NOT in git (gitignored). They need to be on the training machine. Options:
-- Upload from local machine: `scp -r scene/images/ root@<pod-ip>:<port>:/workspace/Replay/scene/images/`
-- Or if they're on Google Drive, download them on the pod
-- The restructure script symlinks to these, so they must exist before training
-
-### 4. After Training: Connect to Viewer
-Per-frame .ply files go to `viewer/public/frames/` with a `manifest.json`:
-```json
-{
-  "frames": ["time_00000.ply", "time_00001.ply", ...],
-  "fps": 30,
-  "baseDir": "/frames/"
-}
+### 3. Upload frame images (NOT in git)
+```bash
+scp -r scene/images/ root@<pod-ip>:<port>:/workspace/Replay/scene/images/
 ```
-`run_training.py` handles this automatically if used.
+
+### 4. Test on 1 timestep first
+```bash
+cd /workspace/Replay
+python3 pipeline_instantsplat.py \
+  --instantsplat-dir /workspace/InstantSplat \
+  --end 1
+```
+
+### 5. If it works, run all 80
+```bash
+python3 pipeline_instantsplat.py \
+  --instantsplat-dir /workspace/InstantSplat
+```
+
+### 6. Download results to local for viewer
+```bash
+scp -r root@<pod-ip>:<port>:/workspace/Replay/instantsplat_output/ ./instantsplat_output/
+python3 collect_for_viewer.py
+cd viewer && npm run dev
+```
+
+### Old pipeline (preserved on `aditya/training` branch)
+The COLMAP → restructure → 4DGS pipeline still lives on the `aditya/training` branch as a fallback.
 
 ## Expected Output Quality
-With 3 cameras and 50k dense initialization points, expect:
-- Recognizable scene geometry from the 3 covered angles
-- Visible motion over the 80-frame sequence
-- Artifacts/blur from angles not covered by any camera (the "back" of subjects)
-- This is a hackathon demo — it won't be photorealistic, but should clearly show the sports moment evolving in 3D
+With InstantSplat per-timestep (4 cameras × 80 timesteps):
+- Full 3D from ALL 4 cameras at every timestamp (vs 3 static poses before)
+- MASt3R handles wide-baseline matching that destroyed COLMAP (1% → should be >50%)
+- cam01 should now work (MASt3R uses learned priors, not just feature matching)
+- Possible frame-to-frame flicker (each timestep is independent) but at 30fps should look smooth
+- ~40-60 min total compute on A100
 
 ## Other Parallel Work Streams
 - **Mia**: Working on gap detection (Stage 5) + Nano Banana repair (Stage 6)
@@ -125,14 +137,15 @@ With 3 cameras and 50k dense initialization points, expect:
 - **Greptile review**: PR #2 open at https://github.com/adityasingh2400/Replay/pull/2
 
 ## Key Files to Read
-- `/Users/aditya/Desktop/Replay/restructure_for_4dgs.py` — data restructure (dense cloud, camera filtering)
-- `/Users/aditya/Desktop/Replay/4DGaussians/scene/multipleview_dataset.py` — the loader (fixed cam01 hardcode)
-- `/Users/aditya/Desktop/Replay/4DGaussians/export_perframe_3DGS.py` — per-frame export (fixed 80 frames)
-- `/Users/aditya/Desktop/Replay/4DGaussians/scene/__init__.py` — dataset type detection
-- `/Users/aditya/Desktop/Replay/4DGaussians/scene/dataset_readers.py` lines 596-633 — readMultipleViewinfos()
-- `/Users/aditya/Desktop/Replay/4DGaussians/utils/render_utils.py` — get_state_at_time()
-- `/Users/aditya/Desktop/Replay/run_training.py` — training orchestrator
-- `/Users/aditya/Desktop/Replay/viewer/src/main.js` — viewer entry point
+- `/Users/aditya/Desktop/Replay/pipeline_instantsplat.py` — **NEW** master pipeline (replaces run_training.py)
+- `/Users/aditya/Desktop/Replay/organize_timesteps.py` — **NEW** organizes frames into per-timestep folders
+- `/Users/aditya/Desktop/Replay/run_instantsplat.py` — **NEW** runs InstantSplat on each timestep
+- `/Users/aditya/Desktop/Replay/collect_for_viewer.py` — **NEW** collects PLYs for the viewer
+- `/Users/aditya/Desktop/Replay/setup_instantsplat.sh` — **NEW** RunPod setup script
+- `/Users/aditya/Desktop/Replay/TECH_LANDSCAPE.md` — full technology research + decision matrix
+- `/Users/aditya/Desktop/Replay/restructure_for_4dgs.py` — OLD data restructure (on aditya/training branch)
+- `/Users/aditya/Desktop/Replay/run_training.py` — OLD training orchestrator (on aditya/training branch)
+- `/Users/aditya/Desktop/Replay/viewer/src/main.js` — viewer entry point (unchanged)
 
 ## User Preferences
 - Uses `python3` not `python`
