@@ -53,8 +53,8 @@ export class UI {
       this._bgIndicator.id = 'bg-load-indicator';
       Object.assign(this._bgIndicator.style, {
         position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(0,0,0,0.7)', color: '#8ef', padding: '4px 14px',
-        borderRadius: '12px', fontSize: '12px', fontFamily: 'monospace',
+        background: 'rgba(13,8,9,0.8)', color: '#D4956A', padding: '4px 14px',
+        borderRadius: '10px', fontSize: '12px', fontFamily: "'JetBrains Mono', monospace",
         zIndex: '100', transition: 'opacity 0.4s', pointerEvents: 'none',
       });
       document.body.appendChild(this._bgIndicator);

@@ -88,9 +88,9 @@ async function initSplatMode(manifest, canvas, renderer, ui) {
   bgCanvas.height = 512;
   const ctx = bgCanvas.getContext('2d');
   const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 360);
-  grad.addColorStop(0, '#111118');
-  grad.addColorStop(0.6, '#0c0c12');
-  grad.addColorStop(1, '#08080c');
+  grad.addColorStop(0, '#171112');
+  grad.addColorStop(0.6, '#110A0D');
+  grad.addColorStop(1, '#0D0809');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 512, 512);
   scene.background = new THREE.CanvasTexture(bgCanvas);
