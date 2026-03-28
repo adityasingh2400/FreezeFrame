@@ -92,16 +92,29 @@ if [ "$CUDA_AVAIL" != "True" ]; then
 fi
 
 # PEP 668 (Ubuntu 24.04+) blocks system-wide pip — override it on disposable RunPod pods
-PIP_FLAGS="--break-system-packages"
+PIP_FLAGS="--break-system-packages --no-deps"
+PIP_FLAGS_FULL="--break-system-packages"
 
-pip install -q $PIP_FLAGS plyfile lpips pytorch_msssim "imageio[ffmpeg]" open3d scikit-image matplotlib tqdm opencv-python-headless
+# Install deps WITHOUT touching torch — use --no-deps first, then fill in missing deps
+TORCH_ORIG=$(python3 -c "import torch; print(torch.__version__)")
+pip install -q $PIP_FLAGS_FULL --no-deps plyfile lpips pytorch_msssim "imageio[ffmpeg]" scikit-image matplotlib tqdm opencv-python-headless 2>&1 | tail -3
+# Now install their sub-deps but exclude torch/torchvision
+pip install -q $PIP_FLAGS_FULL numpy scipy Pillow 2>&1 | tail -2
+
+# Force restore original torch if something clobbered it
+TORCH_AFTER=$(python3 -c "import torch; print(torch.__version__)" 2>/dev/null)
+if [ "$TORCH_AFTER" != "$TORCH_ORIG" ]; then
+    warn "Torch was changed $TORCH_ORIG -> $TORCH_AFTER, restoring..."
+    pip install -q $PIP_FLAGS_FULL "torch==$TORCH_ORIG" --index-url https://download.pytorch.org/whl/cu128 2>&1 | tail -2
+fi
+log "Torch version: $(python3 -c 'import torch; print(torch.__version__)')"
 
 TORCH_SHORT=$(python3 -c "import torch; v=torch.__version__.split('+')[0].rsplit('.',1)[0]; print(v)")
 CUDA_SHORT=$(python3 -c "import torch; print(torch.version.cuda.replace('.','')[:3])")
 log "Installing mmcv for torch=$TORCH_SHORT cuda=$CUDA_SHORT..."
-pip install -q $PIP_FLAGS mmcv==1.6.0 2>/dev/null || \
-  pip install -q $PIP_FLAGS mmcv-full -f "https://download.openmmlab.com/mmcv/dist/cu${CUDA_SHORT}/torch${TORCH_SHORT}/index.html" 2>/dev/null || \
-  pip install -q $PIP_FLAGS mmcv || \
+pip install -q $PIP_FLAGS_FULL mmcv==1.6.0 2>/dev/null || \
+  pip install -q $PIP_FLAGS_FULL mmcv-full -f "https://download.openmmlab.com/mmcv/dist/cu${CUDA_SHORT}/torch${TORCH_SHORT}/index.html" 2>/dev/null || \
+  pip install -q $PIP_FLAGS_FULL mmcv 2>/dev/null || \
   warn "mmcv install failed — will try to proceed anyway"
 ok "Python packages"
 echo ""
@@ -114,11 +127,11 @@ cd "$FOURDGS_DIR"
 git submodule update --init --recursive 2>/dev/null || true
 
 cd submodules/depth-diff-gaussian-rasterization
-pip install -q $PIP_FLAGS . 2>&1 | tail -2
+pip install -q $PIP_FLAGS_FULL . 2>&1 | tail -2
 ok "diff-gaussian-rasterization"
 
 cd "$FOURDGS_DIR/submodules/simple-knn"
-pip install -q $PIP_FLAGS . 2>&1 | tail -2
+pip install -q $PIP_FLAGS_FULL . 2>&1 | tail -2
 ok "simple-knn"
 
 cd "$REPO_DIR"
