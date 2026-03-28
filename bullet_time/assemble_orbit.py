@@ -171,22 +171,27 @@ def assemble_orbit(
 
     print(f"    Repair done in {time.time()-t0:.1f}s")
 
-    # ── Step 5: Assemble strip and write to disk ───────────────────────
-    print("  [5/5] Assembling strip...")
+    # ── Step 5: Assemble strip and write ─────────────────────────────
+    print("  [5/5] Writing strip...")
     filenames = []
 
     for i, cam in enumerate(cam_names):
-        # Write real frame
         fname = f"{cam}.jpg"
-        Image.fromarray(real_frames[cam]).save(str(output_dir / fname), quality=95)
+        Image.fromarray(real_frames[cam]).save(str(output_dir / fname), quality=92)
         filenames.append(fname)
 
-        # Write synthetic frames for this gap
         if i < num_gaps:
             next_cam = cam_names[i + 1]
             for vi in range(views_per_gap):
                 fname = f"synth_{cam}_{next_cam}_{chr(97+vi)}.jpg"
-                Image.fromarray(repaired[(i, vi)]).save(str(output_dir / fname), quality=95)
+                img = repaired[(i, vi)]
+                # Clamp extreme black/white to nearest color
+                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                extremes = (gray < 12) | (gray > 243)
+                if extremes.any():
+                    blurred = cv2.GaussianBlur(img, (21, 21), 0)
+                    img[extremes] = blurred[extremes]
+                Image.fromarray(img).save(str(output_dir / fname), quality=92)
                 filenames.append(fname)
 
     elapsed = time.time() - t_start
