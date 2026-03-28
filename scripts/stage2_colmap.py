@@ -135,18 +135,16 @@ def run_colmap_feature_extraction(image_list: list[Path], database_path: Path, i
 
 
 def run_colmap_matching(database_path: Path):
-    """Run COLMAP exhaustive matching via the binary."""
-    colmap_bin = find_colmap_bin()
-    print("  Running exhaustive feature matching...")
-    cmd = [
-        colmap_bin, "exhaustive_matcher",
-        "--database_path", str(database_path),
-        "--SiftMatching.use_gpu", "1",
-    ]
-    result = subprocess.run(cmd)
-    if result.returncode != 0:
-        print(f"FAIL: exhaustive_matcher exited {result.returncode}")
-        sys.exit(1)
+    """Run COLMAP exhaustive matching via pycolmap with forced CPU device.
+
+    The apt COLMAP binary requires OpenGL even for CPU matching (build artifact).
+    pycolmap with device=cpu bypasses OpenGL entirely and works on headless servers.
+    """
+    print("  Running exhaustive feature matching (pycolmap CPU)...")
+    pycolmap.match_exhaustive(
+        database_path=database_path,
+        device=pycolmap.Device.cpu,
+    )
     print("  Matching done.")
 
 
