@@ -135,16 +135,28 @@ def run_colmap_feature_extraction(image_list: list[Path], database_path: Path, i
 
 
 def run_colmap_matching(database_path: Path):
-    """Run COLMAP exhaustive matching via pycolmap with forced CPU device.
+    """Run COLMAP exhaustive matching.
 
-    The apt COLMAP binary requires OpenGL even for CPU matching (build artifact).
-    pycolmap with device=cpu bypasses OpenGL entirely and works on headless servers.
+    Prefers the COLMAP binary with GPU (fast on A100) when compiled with CUDA.
+    Falls back to pycolmap CPU if the binary is missing or lacks CUDA (e.g. apt package).
     """
-    print("  Running exhaustive feature matching (pycolmap CPU)...")
-    pycolmap.match_exhaustive(
-        database_path=database_path,
-        device=pycolmap.Device.cpu,
-    )
+    if colmap_has_cuda():
+        colmap_bin = find_colmap_bin()
+        print("  Running exhaustive feature matching (COLMAP binary, GPU)...")
+        result = subprocess.run([
+            colmap_bin, "exhaustive_matcher",
+            "--database_path", str(database_path),
+            "--SiftMatching.use_gpu", "1",
+        ])
+        if result.returncode != 0:
+            print(f"FAIL: exhaustive_matcher exited {result.returncode}")
+            sys.exit(1)
+    else:
+        print("  Running exhaustive feature matching (pycolmap CPU — no CUDA colmap)...")
+        pycolmap.match_exhaustive(
+            database_path=database_path,
+            device=pycolmap.Device.cpu,
+        )
     print("  Matching done.")
 
 
