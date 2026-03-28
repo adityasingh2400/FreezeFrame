@@ -92,16 +92,24 @@ if [ "$CUDA_AVAIL" != "True" ]; then
 fi
 
 # PEP 668 (Ubuntu 24.04+) blocks system-wide pip — override it on disposable RunPod pods
-PIP_FLAGS="--break-system-packages"
+PIP_FLAGS="--break-system-packages --no-deps"
+PIP_FLAGS_FULL="--break-system-packages"
 
-pip install -q $PIP_FLAGS plyfile lpips pytorch_msssim "imageio[ffmpeg]" open3d scikit-image matplotlib tqdm opencv-python-headless
+pip install -q $PIP_FLAGS_FULL --ignore-installed plyfile lpips pytorch_msssim "imageio[ffmpeg]" open3d scikit-image matplotlib tqdm opencv-python-headless 2>&1 | tail -5 || {
+    warn "Bulk install had issues, trying one by one..."
+    for pkg in plyfile lpips pytorch_msssim "imageio[ffmpeg]" open3d scikit-image matplotlib tqdm opencv-python-headless; do
+        pip install -q --break-system-packages "$pkg" 2>/dev/null || \
+        pip install -q --break-system-packages --ignore-installed "$pkg" 2>/dev/null || \
+        warn "Failed to install $pkg"
+    done
+}
 
 TORCH_SHORT=$(python3 -c "import torch; v=torch.__version__.split('+')[0].rsplit('.',1)[0]; print(v)")
 CUDA_SHORT=$(python3 -c "import torch; print(torch.version.cuda.replace('.','')[:3])")
 log "Installing mmcv for torch=$TORCH_SHORT cuda=$CUDA_SHORT..."
-pip install -q $PIP_FLAGS mmcv==1.6.0 2>/dev/null || \
-  pip install -q $PIP_FLAGS mmcv-full -f "https://download.openmmlab.com/mmcv/dist/cu${CUDA_SHORT}/torch${TORCH_SHORT}/index.html" 2>/dev/null || \
-  pip install -q $PIP_FLAGS mmcv || \
+pip install -q $PIP_FLAGS_FULL mmcv==1.6.0 2>/dev/null || \
+  pip install -q $PIP_FLAGS_FULL mmcv-full -f "https://download.openmmlab.com/mmcv/dist/cu${CUDA_SHORT}/torch${TORCH_SHORT}/index.html" 2>/dev/null || \
+  pip install -q $PIP_FLAGS_FULL mmcv 2>/dev/null || \
   warn "mmcv install failed — will try to proceed anyway"
 ok "Python packages"
 echo ""
@@ -114,11 +122,11 @@ cd "$FOURDGS_DIR"
 git submodule update --init --recursive 2>/dev/null || true
 
 cd submodules/depth-diff-gaussian-rasterization
-pip install -q $PIP_FLAGS . 2>&1 | tail -2
+pip install -q $PIP_FLAGS_FULL . 2>&1 | tail -2
 ok "diff-gaussian-rasterization"
 
 cd "$FOURDGS_DIR/submodules/simple-knn"
-pip install -q $PIP_FLAGS . 2>&1 | tail -2
+pip install -q $PIP_FLAGS_FULL . 2>&1 | tail -2
 ok "simple-knn"
 
 cd "$REPO_DIR"
