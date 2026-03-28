@@ -173,8 +173,9 @@ def export_poses_bounds(recon, dataset_dir: Path):
     poses_bounds = []
     for image in sorted(images.values(), key=lambda im: im.name):
         cam = cameras[image.camera_id]
-        R_w2c = image.cam_from_world.rotation.matrix()
-        t_w2c = image.cam_from_world.translation
+        xform = image.cam_from_world()
+        R_w2c = xform.rotation.matrix()
+        t_w2c = xform.translation
         R_c2w = R_w2c.T
         t_c2w = -R_c2w @ t_w2c
 
