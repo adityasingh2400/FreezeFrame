@@ -24,10 +24,16 @@ colmap-sparse:
 
 
 train:
+	$(PYTHON) scripts/stage3_instantsplat.py
+
+train-test:
+	$(PYTHON) scripts/stage3_instantsplat.py --start 1 --end 3
+
+train-4dgs:
 	$(PYTHON) scripts/stage3_4dgs.py
 
 export:
-	@echo "Export is part of stage3_4dgs.py — run 'make train'"
+	@echo "Export is part of stage3_instantsplat.py — run 'make train'"
 
 # ============================================================
 # Viewer + Gemini

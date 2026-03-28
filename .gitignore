@@ -17,6 +17,9 @@ output/frames/*.ply
 output/frames/*.splat
 output/output_meta.json
 
+# InstantSplat per-timestep workspace (large intermediate files)
+scene/instantsplat_workspace/
+
 # Gap repair (post-MVP)
 gaps/gap_map.json
 gaps/gap_meta.json
