@@ -6,16 +6,17 @@ const MANIFEST_PATH = '/manifest.json';
 // ── Screen references ─────────────────────────────────────────────────
 
 const landing    = document.getElementById('landing');
-const processing = document.getElementById('processing');
+const agentView  = document.getElementById('agent-view');
 const canvas     = document.getElementById('viewport');
 const hud        = document.getElementById('viewer-hud');
 const fileInput  = document.getElementById('file-input');
 const uploadZone = document.getElementById('upload-zone');
+const agentCircle = document.getElementById('agent-circle');
 
 // ── Upload ────────────────────────────────────────────────────────────
 
 fileInput.addEventListener('change', () => {
-  if (fileInput.files.length > 0) startProcessing();
+  if (fileInput.files.length > 0) showAgentView(fileInput.files);
 });
 
 uploadZone.addEventListener('dragover', (e) => {
@@ -30,40 +31,65 @@ uploadZone.addEventListener('dragleave', () => {
 uploadZone.addEventListener('drop', (e) => {
   e.preventDefault();
   uploadZone.classList.remove('drag-over');
-  if (e.dataTransfer.files.length > 0) startProcessing();
+  if (e.dataTransfer.files.length > 0) showAgentView(e.dataTransfer.files);
 });
 
-// ── Fake Processing Pipeline ──────────────────────────────────────────
+// ── Agent View ────────────────────────────────────────────────────────
 
-const STEPS = ['step-0', 'step-1', 'step-2', 'step-3'];
-const STEP_DELAYS = [0, 900, 1900, 3100];
-const DONE_DELAYS = [800, 1800, 3000, 3600];
-const TRANSITION_DELAY = 4000;
-
-function startProcessing() {
+function showAgentView(files) {
+  // Fade out landing
   landing.classList.add('hidden');
   setTimeout(() => { landing.style.display = 'none'; }, 600);
 
-  processing.classList.add('visible');
+  // Show agent view
+  agentView.classList.add('visible');
 
-  STEPS.forEach((id, i) => {
-    const el = document.getElementById(id);
-    setTimeout(() => { el.classList.add('active'); }, STEP_DELAYS[i]);
-    setTimeout(() => {
-      el.classList.remove('active');
-      el.classList.add('done');
-      if (i === STEPS.length - 1) el.classList.add('final');
-    }, DONE_DELAYS[i]);
-  });
+  // Populate thumbnails
+  const count = Math.min(files.length, 5);
+  for (let i = 0; i < 5; i++) {
+    const thumb = document.getElementById(`thumb-${i}`);
+    const label = thumb.querySelector('.thumb-label');
 
-  setTimeout(() => {
-    processing.classList.add('hidden');
-    setTimeout(() => {
-      processing.style.display = 'none';
-      initViewer();
-    }, 500);
-  }, TRANSITION_DELAY);
+    if (i < count) {
+      // Show filename (trimmed) as label
+      const name = files[i].name.replace(/\.[^.]+$/, '');
+      label.textContent = name.length > 8 ? 'CAM ' + (i + 1) : name;
+
+      // Staggered entrance
+      setTimeout(() => thumb.classList.add('visible'), 200 + i * 120);
+    }
+  }
+
+  // Tap agent circle to trigger merge (placeholder — Phase 3 will use voice)
+  agentCircle.addEventListener('click', triggerMerge, { once: true });
 }
+
+// ── Merge → Viewer ────────────────────────────────────────────────────
+
+function triggerMerge() {
+  // Animate all visible thumbnails into center
+  for (let i = 0; i < 5; i++) {
+    const thumb = document.getElementById(`thumb-${i}`);
+    if (thumb.classList.contains('visible')) {
+      thumb.classList.add('merging');
+    }
+  }
+
+  // Agent circle absorb pulse
+  agentCircle.classList.add('merging');
+
+  // Transition to viewer after animation completes
+  setTimeout(() => {
+    agentView.classList.add('hidden');
+    setTimeout(() => {
+      agentView.style.display = 'none';
+      initViewer();
+    }, 600);
+  }, 900);
+}
+
+// Expose for Phase 3 voice trigger
+window.triggerMerge = triggerMerge;
 
 // ── Viewer ────────────────────────────────────────────────────────────
 
@@ -82,7 +108,6 @@ async function initViewer() {
   const stripPlayer = new ImageStripPlayer(scene);
   const camera = stripPlayer.createCamera();
 
-  // Expose for Phase 3 voice integration
   window.freezeframePlayer = stripPlayer;
 
   let manifest = null;
@@ -116,17 +141,16 @@ async function initViewer() {
   });
 }
 
-// ── Listening Indicator ───────────────────────────────────────────────
-
-const indicator = document.getElementById('listening-indicator');
+// ── Agent / Listening Indicator State ────────────────────────────────
 
 /**
- * Set the listening indicator state.
+ * Set state on both the agent circle and the viewer HUD indicator.
  * @param {'idle'|'listening'|'speaking'} state
  */
 export function setIndicatorState(state) {
-  if (indicator) indicator.dataset.state = state;
+  agentCircle.dataset.state = state;
+  const hud = document.getElementById('listening-indicator');
+  if (hud) hud.dataset.state = state;
 }
 
-// Expose for Phase 3 voice integration
 window.setIndicatorState = setIndicatorState;

@@ -250,6 +250,254 @@ body {
   background: var(--maroon);
 }
 
+/* ── Agent View ── */
+#agent-view {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 25;
+  transition: opacity 0.6s ease;
+}
+
+#agent-view.visible {
+  display: flex;
+}
+
+#agent-view.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#agent-wordmark {
+  position: absolute;
+  top: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#agent-hint {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  text-transform: lowercase;
+  animation: hint-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes hint-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.9; }
+}
+
+/* ── Orbit Container ── */
+#orbit-container {
+  position: relative;
+  width: 500px;
+  height: 500px;
+}
+
+/* Visual orbit ring */
+#orbit-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px dashed var(--border);
+  top: 50%;
+  left: 50%;
+  width: 360px;
+  height: 360px;
+  transform: translate(-50%, -50%);
+  opacity: 0.5;
+}
+
+/* ── Agent Circle ── */
+#agent-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--maroon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  z-index: 2;
+}
+
+#agent-circle:hover {
+  border-color: var(--maroon-bright);
+  box-shadow: 0 0 0 6px rgba(122, 27, 45, 0.1);
+}
+
+#agent-circle[data-state="listening"] {
+  border-color: var(--maroon-bright);
+  box-shadow: 0 0 0 8px rgba(122, 27, 45, 0.12), 0 0 0 16px rgba(122, 27, 45, 0.06);
+  animation: circle-pulse 1.5s ease-in-out infinite;
+}
+
+#agent-circle[data-state="speaking"] {
+  border-color: var(--maroon-bright);
+  box-shadow: 0 0 0 6px rgba(122, 27, 45, 0.15);
+}
+
+@keyframes circle-pulse {
+  0%, 100% { box-shadow: 0 0 0 6px rgba(122, 27, 45, 0.1), 0 0 0 12px rgba(122, 27, 45, 0.05); }
+  50%       { box-shadow: 0 0 0 10px rgba(122, 27, 45, 0.15), 0 0 0 20px rgba(122, 27, 45, 0.06); }
+}
+
+/* Bars inside agent circle */
+#agent-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 32px;
+}
+
+#agent-bars .bar {
+  width: 4px;
+  border-radius: 2px;
+  background: var(--maroon);
+  transform-origin: bottom center;
+}
+
+#agent-circle[data-state="idle"] #agent-bars .bar {
+  height: 4px;
+  opacity: 0.25;
+  animation: none;
+}
+
+#agent-circle[data-state="listening"] #agent-bars .bar {
+  opacity: 1;
+  animation: bar-listen 1s ease-in-out infinite;
+}
+
+#agent-circle[data-state="listening"] #agent-bars .bar:nth-child(1) { animation-delay: 0s;    animation-duration: 1.1s; }
+#agent-circle[data-state="listening"] #agent-bars .bar:nth-child(2) { animation-delay: 0.15s; animation-duration: 0.95s; }
+#agent-circle[data-state="listening"] #agent-bars .bar:nth-child(3) { animation-delay: 0.3s;  animation-duration: 1.05s; }
+#agent-circle[data-state="listening"] #agent-bars .bar:nth-child(4) { animation-delay: 0.15s; animation-duration: 0.9s; }
+#agent-circle[data-state="listening"] #agent-bars .bar:nth-child(5) { animation-delay: 0s;    animation-duration: 1.15s; }
+
+#agent-circle[data-state="speaking"] #agent-bars .bar {
+  opacity: 1;
+  animation: bar-speak 0.5s ease-in-out infinite;
+}
+
+#agent-circle[data-state="speaking"] #agent-bars .bar:nth-child(1) { animation-delay: 0s;    animation-duration: 0.55s; }
+#agent-circle[data-state="speaking"] #agent-bars .bar:nth-child(2) { animation-delay: 0.1s;  animation-duration: 0.4s; }
+#agent-circle[data-state="speaking"] #agent-bars .bar:nth-child(3) { animation-delay: 0.05s; animation-duration: 0.35s; }
+#agent-circle[data-state="speaking"] #agent-bars .bar:nth-child(4) { animation-delay: 0.15s; animation-duration: 0.45s; }
+#agent-circle[data-state="speaking"] #agent-bars .bar:nth-child(5) { animation-delay: 0.08s; animation-duration: 0.5s; }
+
+/* ── Thumbnail Circles ── */
+/* Positions: 5 items at 72° intervals, orbit radius 180px, starting top (-90°) */
+.thumb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--border-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: border-color 0.2s;
+}
+
+/* Each thumb entrance is triggered by .visible class added via JS with stagger */
+.thumb.visible {
+  opacity: 1;
+  animation: thumb-enter 0.5s ease-out forwards;
+}
+
+@keyframes thumb-enter {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Position each thumb around the orbit (radius 180px) */
+/* angle = -90 + index * 72 degrees */
+/* x = 180 * cos(angle), y = 180 * sin(angle) */
+#thumb-0 { margin-left:    0px; margin-top: -180px; animation-delay: 0.0s; } /* top        */
+#thumb-1 { margin-left:  171px; margin-top:  -56px; animation-delay: 0.1s; } /* top-right  */
+#thumb-2 { margin-left:  106px; margin-top:  146px; animation-delay: 0.2s; } /* bot-right  */
+#thumb-3 { margin-left: -106px; margin-top:  146px; animation-delay: 0.3s; } /* bot-left   */
+#thumb-4 { margin-left: -171px; margin-top:  -56px; animation-delay: 0.4s; } /* top-left   */
+
+/* Subtle float per thumb */
+.thumb.visible:nth-child(1) { animation: thumb-enter 0.5s ease-out forwards, thumb-float 3.2s 0.5s ease-in-out infinite; }
+.thumb.visible:nth-child(2) { animation: thumb-enter 0.5s ease-out forwards, thumb-float 3.6s 0.6s ease-in-out infinite; }
+.thumb.visible:nth-child(3) { animation: thumb-enter 0.5s ease-out forwards, thumb-float 3.0s 0.7s ease-in-out infinite; }
+.thumb.visible:nth-child(4) { animation: thumb-enter 0.5s ease-out forwards, thumb-float 3.4s 0.8s ease-in-out infinite; }
+.thumb.visible:nth-child(5) { animation: thumb-enter 0.5s ease-out forwards, thumb-float 3.8s 0.5s ease-in-out infinite; }
+
+@keyframes thumb-float {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+  50%       { transform: translate(-50%, -50%) translateY(-7px); }
+}
+
+.thumb-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  pointer-events: none;
+  text-align: center;
+  padding: 4px;
+  line-height: 1.3;
+}
+
+/* ── Merge Animation ── */
+.thumb.merging {
+  animation: thumb-merge 0.6s ease-in forwards !important;
+  pointer-events: none;
+}
+
+#thumb-0.merging { animation-delay: 0.00s !important; }
+#thumb-1.merging { animation-delay: 0.05s !important; }
+#thumb-2.merging { animation-delay: 0.10s !important; }
+#thumb-3.merging { animation-delay: 0.05s !important; }
+#thumb-4.merging { animation-delay: 0.00s !important; }
+
+@keyframes thumb-merge {
+  0%   { opacity: 1; }
+  70%  { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+}
+
+#agent-circle.merging {
+  animation: agent-absorb 0.4s 0.5s ease-out forwards;
+}
+
+@keyframes agent-absorb {
+  0%   { transform: translate(-50%, -50%) scale(1); }
+  40%  { transform: translate(-50%, -50%) scale(1.18); border-color: var(--maroon-bright); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
 /* ── Viewer ── */
 canvas#viewport {
   position: fixed;
