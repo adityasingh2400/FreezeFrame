@@ -1,4 +1,4 @@
-.PHONY: setup sync colmap train export view proxy demo validate validate-a validate-b validate-c validate-d
+.PHONY: setup sync colmap train export convert view proxy demo validate validate-a validate-b validate-c validate-d
 
 PYTHON ?= python3
 
@@ -32,6 +32,9 @@ export:
 # ============================================================
 # Viewer + Gemini
 # ============================================================
+
+convert:
+	$(PYTHON) scripts/convert_to_sog.py
 
 view:
 	$(PYTHON) scripts/stage4_viewer.py

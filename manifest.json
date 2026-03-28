@@ -1,0 +1,9 @@
+{
+  "name": "test",
+  "frames": [
+    "frame_00000.spz"
+  ],
+  "baseDir": "/output/frames_sog/",
+  "fps": 30,
+  "format": "spz"
+}
