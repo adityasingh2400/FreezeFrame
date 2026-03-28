@@ -157,9 +157,9 @@ for cam in cam02 cam03 cam04; do
 done
 echo ""
 
-# ── 6. FAST training ────────────────────────────────────────────────
+# ── 6. FAST smoke test (validates data before quality run) ───────
 
-log "=== FAST TRAINING (batch=4, 5k iters, ~2-3 min on A100) ==="
+log "=== SMOKE TEST (3k iters, ~2 min — verifying data loads) ==="
 timer_start
 cd "$FOURDGS_DIR"
 
@@ -169,28 +169,13 @@ python3 train.py \
     --expname "multipleview/replay_fast" \
     --configs arguments/multipleview/replay_fast.py
 
-timer_end "Fast training"
+timer_end "Smoke test"
+ok "Data loads correctly — proceeding to quality training"
 echo ""
 
-# ── 7. Export fast PLYs ──────────────────────────────────────────────
+# ── 7. QUALITY training (the real run) ───────────────────────────
 
-log "Exporting per-frame PLYs (fast)..."
-FAST_MODEL="$FOURDGS_DIR/output/multipleview/replay_fast"
-FAST_ITER=$(ls -1 "$FAST_MODEL/point_cloud/" 2>/dev/null | grep "iteration_" | sed 's/iteration_//' | sort -n | tail -1)
-
-python3 export_perframe_3DGS.py \
-    --iteration "$FAST_ITER" \
-    --configs arguments/multipleview/replay_fast.py \
-    --model_path "$FAST_MODEL"
-
-FAST_EXPORT="$FAST_MODEL/gaussian_pertimestamp"
-FAST_COUNT=$(ls "$FAST_EXPORT"/time_*.ply 2>/dev/null | wc -l)
-ok "Fast: $FAST_COUNT PLYs"
-echo ""
-
-# ── 8. QUALITY training ─────────────────────────────────────────────
-
-log "=== QUALITY TRAINING (batch=4, 10k iters, ~8-10 min on A100) ==="
+log "=== QUALITY TRAINING (batch=2, 14k iters — full convergence) ==="
 timer_start
 
 python3 train.py \
@@ -202,7 +187,7 @@ python3 train.py \
 timer_end "Quality training"
 echo ""
 
-# ── 9. Export quality PLYs ───────────────────────────────────────────
+# ── 8. Export per-frame PLYs from quality model ──────────────────
 
 log "Exporting per-frame PLYs (quality)..."
 QUAL_MODEL="$FOURDGS_DIR/output/multipleview/replay"
@@ -215,10 +200,10 @@ python3 export_perframe_3DGS.py \
 
 QUAL_EXPORT="$QUAL_MODEL/gaussian_pertimestamp"
 QUAL_COUNT=$(ls "$QUAL_EXPORT"/time_*.ply 2>/dev/null | wc -l)
-ok "Quality: $QUAL_COUNT PLYs"
+ok "Quality: $QUAL_COUNT per-frame PLYs exported"
 echo ""
 
-# ── 10. Generate viewer manifest ────────────────────────────────────
+# ── 9. Generate viewer manifest ──────────────────────────────────────
 
 log "Generating viewer manifest..."
 cd "$REPO_DIR"
@@ -242,24 +227,21 @@ print(f'Manifest: {len(ns)} frames')
 ok "Viewer manifest ready"
 echo ""
 
-# ── 11. Summary ──────────────────────────────────────────────────────
+# ── 10. Summary ──────────────────────────────────────────────────────
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START ))
 
 echo ""
 echo "============================================================"
-echo "  REPLAY — ALL DONE"
+echo "  REPLAY — TRAINING COMPLETE"
 echo "  Total time: $(( TOTAL_ELAPSED / 60 ))m $(( TOTAL_ELAPSED % 60 ))s"
 echo "============================================================"
 echo ""
-echo "  Fast model:    $FAST_MODEL ($FAST_COUNT frames)"
-echo "  Quality model: $QUAL_MODEL ($QUAL_COUNT frames)"
+echo "  Quality model: $QUAL_MODEL"
+echo "  Per-frame PLYs: $QUAL_EXPORT ($QUAL_COUNT frames)"
 echo "  Viewer PLYs:   $VIEWER_FRAMES"
 echo ""
-echo "  Download results to your laptop:"
-echo "    scp -r root@\$(hostname -I | awk '{print \$1}'):\$VIEWER_FRAMES/ ./frames/"
-echo ""
-echo "  Or from your laptop (fill in pod IP and port):"
+echo "  Download to your laptop (fill in PORT and POD_IP from RunPod):"
 echo "    scp -P PORT -r root@POD_IP:/workspace/Replay/viewer/public/frames/ ./viewer/public/frames/"
 echo "    scp -P PORT root@POD_IP:/workspace/Replay/viewer/public/manifest.json ./viewer/public/"
 echo ""

@@ -1,8 +1,7 @@
 _base_ = './default.py'
 
-# FAST config for Replay — smoke test on A100, ~2-3 min
-# Cranked batch_size for A100 80GB VRAM, reduced iters
-# Switch to replay.py for the final quality run
+# FAST smoke-test config — verifies data loads correctly before quality run
+# ~2-3 min on A100. Output will look rough. Only used for validation.
 
 ModelHiddenParams = dict(
     kplanes_config={
@@ -25,10 +24,10 @@ ModelHiddenParams = dict(
 OptimizationParams = dict(
     dataloader=True,
     batch_size=4,
-    iterations=5000,
-    coarse_iterations=1500,
-    densify_until_iter=3500,
-    opacity_reset_interval=2000,
+    iterations=3000,
+    coarse_iterations=1000,
+    densify_until_iter=2000,
+    opacity_reset_interval=1500,
     opacity_threshold_coarse=0.005,
     opacity_threshold_fine_init=0.005,
     opacity_threshold_fine_after=0.005,
