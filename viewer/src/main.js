@@ -135,28 +135,13 @@ async function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // Sort frequency control — skip renderer.render() (and Spark's Gaussian depth sort)
-  // when the camera has barely moved, capping skips at MAX_SKIP_MS for safety.
-  const SORT_ANGLE_THRESHOLD = 0.02; // radians (~1.1°)
-  const MAX_SKIP_MS = 150;
-  const _lastSortQuat = new THREE.Quaternion();
-  let _lastSortTime = 0;
-
   function animate(timestamp) {
     player.update(timestamp);
     director.update(timestamp);
     cameraCtrl.update();
     timeline.update();
     ui.updateFps(timestamp);
-
-    const angleDelta = _lastSortQuat.angleTo(camera.quaternion);
-    const timeSinceSort = timestamp - _lastSortTime;
-
-    if (angleDelta >= SORT_ANGLE_THRESHOLD || timeSinceSort >= MAX_SKIP_MS) {
-      renderer.render(scene, camera);
-      _lastSortQuat.copy(camera.quaternion);
-      _lastSortTime = timestamp;
-    }
+    renderer.render(scene, camera);
   }
 
   renderer.setAnimationLoop(animate);
