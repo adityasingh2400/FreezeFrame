@@ -127,11 +127,11 @@ cd "$FOURDGS_DIR"
 git submodule update --init --recursive 2>/dev/null || true
 
 cd submodules/depth-diff-gaussian-rasterization
-pip install -q $PIP_FLAGS_FULL . 2>&1 | tail -2
+pip install -q $PIP_FLAGS_FULL --no-build-isolation . 2>&1 | tail -2
 ok "diff-gaussian-rasterization"
 
 cd "$FOURDGS_DIR/submodules/simple-knn"
-pip install -q $PIP_FLAGS_FULL . 2>&1 | tail -2
+pip install -q $PIP_FLAGS_FULL --no-build-isolation . 2>&1 | tail -2
 ok "simple-knn"
 
 cd "$REPO_DIR"
