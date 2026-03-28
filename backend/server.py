@@ -8,6 +8,7 @@ import os
 import time
 import subprocess
 import glob
+import base64
 
 import firebase_admin
 from firebase_admin import credentials, storage, firestore
@@ -22,10 +23,10 @@ import cv2
 
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
-db = firestore.client()                        # NEW: Firestore client for writing results
+db     = firestore.client()
 bucket = storage.bucket("replay-5ce56.firebasestorage.app")
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])  # NEW
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 original_dir = os.getcwd()
 
@@ -43,7 +44,7 @@ def detect_peak_moment(video_path: str) -> float:
         ret, frame = cap.read()
         if not ret:
             break
-        if frame_idx % int(fps) == 0:  # one frame per second
+        if frame_idx % int(fps) == 0:
             _, buf = cv2.imencode(".jpg", frame)
             frame_data.append((frame_idx / fps, buf.tobytes()))
         frame_idx += 1
@@ -53,22 +54,27 @@ def detect_peak_moment(video_path: str) -> float:
         return 0.0
 
     model = genai.GenerativeModel("gemini-2.0-flash")
-    parts = []
+
+    # Build parts: text label + inline image for each frame
+    parts = ["These are frames from a sports video, one per second. "
+             "Which timestamp (in seconds) shows the peak action moment — "
+             "the dunk, catch, goal, or key play? Reply with only the number."]
+
     for ts, img_bytes in frame_data:
         parts.append(f"Frame at {ts:.1f}s:")
-        parts.append({"mime_type": "image/jpeg", "data": img_bytes})
+        parts.append({
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": base64.b64encode(img_bytes).decode("utf-8"),
+            }
+        })
 
-    response = model.generate_content([
-        "These are frames from a sports video, one per second. "
-        "Which timestamp (in seconds) shows the peak action moment — the dunk, catch, goal, or key play? "
-        "Reply with only the number.",
-        *parts
-    ])
+    response = model.generate_content(parts)
 
     try:
         return float(response.text.strip())
     except ValueError:
-        return len(frame_data) / 2  # fallback: midpoint
+        return frame_data[len(frame_data) // 2][0]  # fallback: midpoint
 
 
 def trim_video(input_path: str, output_path: str, center_ts: float, window: float = 3.0):
@@ -78,7 +84,7 @@ def trim_video(input_path: str, output_path: str, center_ts: float, window: floa
     cap.release()
 
     start = max(0, center_ts - window)
-    end = min(duration, center_ts + window)
+    end   = min(duration, center_ts + window)
 
     subprocess.run([
         "ffmpeg", "-y",
@@ -86,30 +92,24 @@ def trim_video(input_path: str, output_path: str, center_ts: float, window: floa
         "-ss", str(start),
         "-to", str(end),
         "-c", "copy",
-        output_path
+        output_path,
     ], check=True)
 
 
-# ── Reconstruction (replaces instant-ngp.exe call from 3dReal) ────────────────
+# ── Reconstruction ────────────────────────────────────────────────────────────
 
 def run_nerfstudio(video_path: str, work_dir: str) -> str:
-    """
-    Run nerfstudio pipeline on video. Returns path to rendered orbit.mp4.
-    Replaces 3dReal's colmap2nerf.py + instant-ngp.exe calls.
-    Install once on RunPod: pip install nerfstudio
-    """
+    """Run nerfstudio pipeline on video. Returns path to rendered orbit.mp4."""
     processed_dir = os.path.join(work_dir, "processed")
-    output_dir = os.path.join(work_dir, "output")
-    orbit_path = os.path.join(work_dir, "orbit.mp4")
+    output_dir    = os.path.join(work_dir, "output")
+    orbit_path    = os.path.join(work_dir, "orbit.mp4")
 
-    # COLMAP + data processing (nerfstudio handles this internally)
     subprocess.run([
         "ns-process-data", "video",
         "--data", video_path,
         "--output-dir", processed_dir,
     ], check=True)
 
-    # Train nerfacto (~10-15 min on A100)
     subprocess.run([
         "ns-train", "nerfacto",
         "--data", processed_dir,
@@ -117,13 +117,12 @@ def run_nerfstudio(video_path: str, work_dir: str) -> str:
         "--max-num-iterations", "10000",
     ], check=True)
 
-    # Find the config file nerfstudio wrote
+    # Find config.yml written by nerfstudio
     config_files = glob.glob(os.path.join(output_dir, "**", "config.yml"), recursive=True)
     if not config_files:
         raise RuntimeError("nerfstudio config.yml not found after training")
-    config_path = config_files[0]
+    config_path = sorted(config_files)[-1]  # latest if multiple
 
-    # Render orbit flyaround video
     subprocess.run([
         "ns-render", "interpolate",
         "--load-config", config_path,
@@ -134,38 +133,40 @@ def run_nerfstudio(video_path: str, work_dir: str) -> str:
     return orbit_path
 
 
-# ── Main loop (from 3dReal, updated for Linux + result upload) ────────────────
+# ── Main pipeline ─────────────────────────────────────────────────────────────
 
 def process_session(session_id: str, video_dir: str):
-    """Download videos, run Gemini + nerfstudio, upload result."""
+    """Concatenate → Gemini peak → trim → nerfstudio → upload result."""
 
-    # Concatenate clips — from 3dReal
     mov_files = [f for f in os.listdir(video_dir) if f.lower().endswith(".mov")]
-    clips = [VideoFileClip(os.path.join(video_dir, f)).rotate(90) for f in mov_files]
+    if not mov_files:
+        print(f"No .mov files in {video_dir}, skipping.")
+        return
+
+    print(f"Processing session {session_id} ({len(mov_files)} clips)...")
+
+    clips = [VideoFileClip(os.path.join(video_dir, f)) for f in mov_files]
     combined_path = os.path.join(video_dir, "combined.mp4")
     concatenate_videoclips(clips, method="compose").write_videofile(combined_path, codec="libx264")
     for c in clips:
         c.close()
 
-    # NEW: Gemini peak moment → trim
     print("Detecting peak moment with Gemini...")
     peak_ts = detect_peak_moment(combined_path)
-    print(f"  Peak moment at {peak_ts:.1f}s")
+    print(f"  Peak moment: {peak_ts:.1f}s")
+
     trimmed_path = os.path.join(video_dir, "trimmed.mp4")
     trim_video(combined_path, trimmed_path, peak_ts)
 
-    # NEW: nerfstudio (replaces instant-ngp.exe)
-    print("Running nerfstudio reconstruction...")
+    print("Running nerfstudio reconstruction (~10-15 min on A100)...")
     orbit_path = run_nerfstudio(trimmed_path, video_dir)
 
-    # NEW: upload orbit.mp4 to Firebase Storage
     print("Uploading result...")
     result_blob = bucket.blob(f"results/{session_id}/orbit.mp4")
     result_blob.upload_from_filename(orbit_path, content_type="video/mp4")
     result_blob.make_public()
     result_url = result_blob.public_url
 
-    # NEW: write result to Firestore so iOS app picks it up
     db.collection("sessions").document(session_id).set({
         "status": "done",
         "result_url": result_url,
@@ -173,36 +174,53 @@ def process_session(session_id: str, video_dir: str):
     print(f"Done. Result: {result_url}")
 
 
-def loop(blobs):
-    """From 3dReal — find most recent upload directory, download videos."""
-    blobs = [b for b in blobs if len(b.name) == 62]
-    most_recent = max((int(b.name[7:21]) for b in blobs), default=0)
-    session_id = str(most_recent)
+def get_session_id(blob_name: str):
+    """Extract session ID from blob path: videos/{sessionId}/{file} → sessionId"""
+    parts = blob_name.split("/")
+    if len(parts) >= 3 and parts[0] == "videos":
+        try:
+            int(parts[1])   # session IDs are numeric timestamps
+            return parts[1]
+        except ValueError:
+            pass
+    return None
 
-    video_dir = os.path.join("data", session_id)
+
+def loop(blobs):
+    """Find most recent session, download its videos, process."""
+    sessions = {}
+    for blob in blobs:
+        sid = get_session_id(blob.name)
+        if sid:
+            sessions.setdefault(sid, []).append(blob)
+
+    if not sessions:
+        return
+
+    session_id = max(sessions.keys())  # most recent timestamp
+    video_dir  = os.path.join("data", session_id)
     os.makedirs(video_dir, exist_ok=True)
 
-    for blob in blobs:
-        if session_id in blob.name:
-            dest = os.path.join(video_dir, blob.name.split("/")[-1])
+    for blob in sessions[session_id]:
+        dest = os.path.join(video_dir, blob.name.split("/")[-1])
+        if not os.path.exists(dest):
             blob.download_to_filename(dest)
 
-    # NEW: write processing status before starting
     db.collection("sessions").document(session_id).set({"status": "processing"})
-
     process_session(session_id, video_dir)
 
 
-# ── Polling loop — from 3dReal ────────────────────────────────────────────────
+# ── Polling loop ──────────────────────────────────────────────────────────────
 
 blobs = list(bucket.list_blobs(prefix="videos/"))
+print(f"Backend started. Watching for uploads ({len(blobs)} existing blobs)...")
 
 while True:
     curr_blobs = list(bucket.list_blobs(prefix="videos/"))
     print(f"check: {len(curr_blobs)} blobs (was {len(blobs)})")
 
     if len(curr_blobs) > len(blobs):
-        loop(bucket.list_blobs(prefix="videos/"))
+        loop(curr_blobs)
 
-    blobs = list(bucket.list_blobs(prefix="videos/"))
+    blobs = curr_blobs
     time.sleep(5)
