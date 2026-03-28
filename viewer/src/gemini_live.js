@@ -12,10 +12,73 @@ const PROXY_URL   = 'ws://localhost:8765';
 const MIC_RATE    = 16000;
 const OUTPUT_RATE = 24000;
 
+// ── Debug console ─────────────────────────────────────────────────────
+
+function debugLog(text, type = 'sys') {
+  const log = document.getElementById('debug-log');
+  if (!log) return;
+  const line = document.createElement('div');
+  line.className = `debug-line ${type}`;
+  line.textContent = text;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+  // Keep max 60 lines
+  while (log.children.length > 60) log.removeChild(log.firstChild);
+}
+
+// Input transcription via Web Speech API
+function startSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  const rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+  let lastFinal = '';
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        if (t !== lastFinal) { debugLog(t, 'you'); setTranscript('you', t); lastFinal = t; }
+      } else interim = t;
+    }
+    if (interim) {
+      setTranscript('you', interim);
+      const last = document.querySelector('#debug-log .you:last-child');
+      if (last && last.dataset.interim) last.textContent = interim;
+      else { const el = document.createElement('div'); el.className = 'debug-line you'; el.dataset.interim = '1'; el.textContent = interim; document.getElementById('debug-log')?.appendChild(el); }
+    }
+  };
+  rec.onend = () => setTimeout(() => rec.start(), 300);
+  rec.start();
+}
+
 // ── Overlay helpers ────────────────────────────────────────────────────
 
-const overlayEl  = () => document.getElementById('viewer-overlay-text');
+const overlayEl   = () => document.getElementById('viewer-overlay-text');
 const indicatorEl = () => document.getElementById('listening-indicator');
+
+let _youTimer = null;
+let _aiTimer  = null;
+
+function setTranscript(who, text) {
+  const row  = document.getElementById(`transcript-${who}`);
+  const span = document.getElementById(`transcript-${who}-text`);
+  if (!row || !span) return;
+  span.textContent = text;
+  row.classList.toggle('visible', !!text);
+
+  // Auto-hide YOU after 4s, GEMINI after 6s
+  const timer = who === 'you' ? '_youTimer' : '_aiTimer';
+  if (window[timer]) clearTimeout(window[timer]);
+  if (text) {
+    const delay = who === 'you' ? 4000 : 6000;
+    window[timer] = setTimeout(() => {
+      row.classList.remove('visible');
+    }, delay);
+  }
+}
 
 function setOverlay(text, mode = 'output') {
   const el = overlayEl();
@@ -146,13 +209,17 @@ export async function connectVoice() {
 
   ws.onopen = () => {
     console.log('[VOICE] WebSocket open');
+    window._voiceWs = ws;
     ws.send(JSON.stringify({ type: 'init' }));
     setIndicator('listening');
     setOverlay('');
+    debugLog('Connected to Gemini Live', 'sys');
+    startSpeechRecognition();
   };
 
   ws.onclose = () => {
     console.log('[VOICE] WebSocket closed');
+    debugLog('Disconnected', 'sys');
     setIndicator('idle');
     workletNode.disconnect();
     micSource.disconnect();
@@ -161,6 +228,7 @@ export async function connectVoice() {
 
   ws.onerror = (err) => {
     console.error('[VOICE] WebSocket error:', err);
+    debugLog('Connection error', 'sys');
     setOverlay('Voice connection failed', 'error');
     setIndicator('idle');
   };
@@ -186,18 +254,23 @@ export async function connectVoice() {
       }
 
       case 'input_transcript': {
-        if (msg.text) setOverlay(msg.text, 'input');
+        if (msg.text) { setOverlay(msg.text, 'input'); debugLog(msg.text, 'you'); }
         break;
       }
 
       case 'output_transcript': {
-        if (msg.text) setOverlay(msg.text, 'output');
+        if (msg.text) {
+          setOverlay(msg.text, 'output');
+          setTranscript('ai', msg.text);
+          debugLog(msg.text, 'ai');
+        }
         break;
       }
 
       case 'navigate': {
         const frame = msg.frame;
         const label = msg.label || '';
+        debugLog(`navigate → ${label} (frame ${frame})`, 'tool');
         console.log(`[VOICE] Navigate → frame ${frame} (${label})`);
 
         if (player && typeof frame === 'number') {
@@ -208,8 +281,20 @@ export async function connectVoice() {
         break;
       }
 
+      case 'zoom': {
+        debugLog(`zoom ${msg.action}`, 'tool');
+        const cam = window.freezeframeCamera;
+        if (!cam) break;
+        const step = 0.3;
+        if (msg.action === 'in')    cam.zoom = Math.min(cam.zoom + step, 5);
+        if (msg.action === 'out')   cam.zoom = Math.max(cam.zoom - step, 0.3);
+        if (msg.action === 'reset') cam.zoom = 1;
+        cam.updateProjectionMatrix();
+        break;
+      }
+
       case 'tool_ack': {
-        // describe_moment / explain_moment — nothing extra needed
+        debugLog(msg.tool, 'tool');
         break;
       }
 
@@ -227,7 +312,9 @@ export async function connectVoice() {
 
     const int16  = new Int16Array(e.data);
     const bytes  = new Uint8Array(int16.buffer);
-    const b64    = btoa(String.fromCharCode(...bytes));
+    let b64 = '';
+    for (let i = 0; i < bytes.length; i++) b64 += String.fromCharCode(bytes[i]);
+    b64 = btoa(b64);
     ws.send(JSON.stringify({ type: 'audio_in', data: b64 }));
   };
 

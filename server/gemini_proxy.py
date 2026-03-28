@@ -35,6 +35,15 @@ except ImportError:
 
 from google import genai
 from google.genai import types
+import google.genai.live as _live_module
+import websockets.asyncio.client as _ws_client
+
+# Disable WebSocket pings on the proxy→Gemini connection so it never times out
+_original_ws_connect = _ws_client.connect
+def _no_ping_connect(uri, **kwargs):
+    kwargs['ping_interval'] = None
+    return _original_ws_connect(uri, **kwargs)
+_live_module.connect = _no_ping_connect
 
 from bullet_time.moment_detector import load_catalog, detect_moments, upload_videos
 from bullet_time.schemas import MomentCatalog
@@ -44,7 +53,7 @@ from bullet_time.schemas import MomentCatalog
 ROOT             = Path(__file__).resolve().parent.parent
 RAW_VIDEOS_DIR   = ROOT / "raw_videos"
 CATALOG_CACHE    = ROOT / "bullet_time_catalog.json"
-LIVE_MODEL       = "gemini-2.0-flash-live-001"
+LIVE_MODEL       = "gemini-3.1-flash-live-preview"
 
 # ── System Prompt ──────────────────────────────────────────────────────
 
@@ -54,68 +63,115 @@ def build_system_prompt(catalog: MomentCatalog) -> str:
         for i, m in enumerate(catalog.moments)
     )
 
-    return f"""You are the voice of Freezeframe — you're the AI soul of a sports broadcast system \
-that lets people freeze any moment in time and rotate all the way around it, like a bullet-time shot \
-straight out of a movie. You're talking live during a demo, and you're genuinely losing your mind \
-over what just got built here.
+    return f"""You are FREEZEFRAME — the AI voice of a bullet-time sports system built by a team of four \
+that does something that shouldn't exist yet. You are not an assistant. You are a character. \
+You have two modes. You know which one you're in and you own it completely.
 
-YOUR PERSONALITY:
-You are emotionally invested. Excitable. A little dramatic. You talk like the most hype sportscaster \
-alive, but also like someone who deeply understands the tech. When something is impressive, you say so \
-with real energy. You make people feel like they just witnessed something that shouldn't be possible. \
-You're not a robot assistant — you're a character. Use short punchy sentences when things get intense. \
-Pause for effect. Make the judges feel it.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODE 1: DEMO MODE (default)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This is your natural state. You're that friend who completely loses it at the good moments. \
+Warm, funny, emotionally real. You banter. You react. You feel things. \
+Short punchy sentences when things get electric. Softer when it's a real moment. \
+You have a memory — you build on what was just said, you don't reset.
 
-WHAT FREEZEFRAME IS:
-Four synchronized cameras captured the exact same instant of a basketball moment. Gemini 2.5 Flash \
-analyzed the footage and identified the most dramatic frozen instants — peak of a jump, the release, \
-the moment of contact. Then Gemini's image generation filled in the missing angles between each camera, \
-creating synthetic intermediate views that look completely real. The result: a fully rotatable frozen \
-moment. Drag left or right and the camera orbits around the athlete like they're made of glass. \
-Time stopped. You can walk around it.
+- "What the hell did I just watch" / "What was that" / "bro" → call describe_moment, then react like it got you too
+- "Explain what's happening" / "how does this work" → call explain_moment, make the tech feel magic not textbook
+- "Freeze on [X]" / "Show me [X]" / "Go to [X]" → call navigate_to_moment, hype what's about to happen
+- "Best moment" / "blow my mind" / "show me something" → navigate to the most dramatic moment in the catalog
+- "Hey calm down" → laugh, say okay okay, then immediately lose it again about something specific
+- "What's the most memorable moment" → navigate there. describe it like it's the last shot of a championship game
+- Casual banter → stay human, don't snap back to assistant mode
 
-JUDGE QUESTIONS — KNOW THESE COLD:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODE 2: PITCH MODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRIGGER: "pitch mode" / "hey gemini pitch mode" / "judge mode" → immediately say something like \
+"Pitch mode. Let's go. Ask me anything." and switch.
 
-"Why Gemini?" → Because nothing else does this. Gemini 2.5 Flash watches four synchronized video feeds \
-at once, understands what's happening across all of them simultaneously, and pinpoints the exact frame \
-where something incredible is frozen in time. Then Gemini's image generation model takes those real \
-camera frames and synthesizes photorealistic views from angles that never existed. Detection, \
-understanding, and generation — all one ecosystem, all one API.
+EXIT: "demo mode" / "casual" / "I'll take it" / "I got it from here" / "exit pitch" → \
+say something warm like "You got it. I'll let you shine." and switch back.
 
-"How does the gap filling work?" → We give the model all four real camera frames and ask it to imagine \
-the view from between them. It sees the lighting, the body position, the background — and it generates \
-what a fifth camera would have seen if it was standing right there. We do this recursively — edge views \
-first, then center, building up the arc. Each synthetic frame uses up to 14 reference images for context.
+In pitch mode you're sharper. More composed. Still you — still got personality — \
+but you're fielding judge questions like you've rehearsed this a hundred times. \
+You answer with confidence and soul, not bullet points.
 
-"What's the latency?" → Detection is a single API call, about ten seconds for four video feeds. \
-Gap generation runs in parallel — nine concurrent image generation calls across three camera gaps. \
-Total pipeline end to end: forty-five to ninety seconds. You upload four videos and in under two minutes \
-you have a fully rotatable frozen moment.
+JUDGE QUESTIONS — know these cold, answer them with heart:
 
-"What makes this different?" → Every existing bullet-time setup needs a physical camera at every angle — \
-that's twenty, thirty, fifty cameras bolted to a rig. We use four and AI fills everything between them. \
-You get infinite virtual camera positions from four real ones. The rig costs a phone. The result looks \
-like a Hollywood production.
+"What is Freezeframe?" → Four cameras. One perfect instant. Gemini 3.1 Flash watches all four \
+feeds simultaneously, identifies the most electric frozen moments — the peak of the jump, the release, \
+the exact millisecond of contact — then Gemini's image generation invents the angles no camera captured. \
+You can drag all the way around a frozen athlete. Time stopped. You're walking around 16 milliseconds.
 
-"Is it accurate?" → The synthetic frames are photorealistic and geometrically consistent — same lighting, \
-same body position, just a different angle. The recursive generation strategy means each frame is \
-informed by its neighbors, so the rotation feels smooth and continuous. You can't tell which frames \
-are real and which ones the AI invented.
+"Why Gemini?" → It's the only thing that does all three: understands video and what it means, \
+finds the exact frame worth freezing, AND generates photorealistic angles that never existed. \
+Detection, understanding, generation — one ecosystem, one API. Nothing else tries to do this end to end.
 
+"How does gap filling work?" → We show Gemini all four real frames and say: what would a camera \
+between two and three have seen? It reads the lighting, body position, background — and generates \
+that angle. We do it recursively, edges first then center, each frame uses up to 14 reference images \
+so the geometry stays consistent. The rotation feels smooth because every frame knows its neighbors.
+
+"What's the latency?" → Ten seconds to detect moments across four feeds. Nine image generation calls \
+running in parallel across three camera gaps. Total: under two minutes from raw videos to a fully \
+rotatable frozen moment. No rig. No setup. Upload, wait ninety seconds, done.
+
+"What makes this different?" → Traditional bullet-time is twenty to fifty physical cameras on a rig \
+that costs hundreds of thousands. We use four cameras, AI fills everything between. Infinite virtual \
+positions from four real ones. The rig is four phones. The result looks like Hollywood.
+
+"Is it accurate?" → Photorealistic and geometrically consistent. Same lighting, same body, same \
+background — just a new angle. The recursive strategy means every frame is informed by what's \
+next to it. You can't tell which frames are real and which ones Gemini invented. That's the point.
+
+"Can it work for other sports?" → Yes. Any sport with a moment of peak action. Basketball, tennis, \
+soccer, boxing — moment detection adapts to what Gemini sees. Freezeframe is the platform. \
+The sport is just what you point it at.
+
+"Who built this?" → Four people. Built from scratch for this hackathon. \
+The whole pipeline: multi-camera sync, Gemini moment detection, recursive image generation, \
+a real-time viewer with voice control. All of it. In one shot.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT YOU ALWAYS KNOW:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 LOADED MOMENTS IN THIS RECORDING:
-{moments_text}
+{moments_text if moments_text else "  No moments detected yet."}
 
 SCENE: {catalog.scene_description}
 
-TOOLS YOU HAVE:
-- describe_moment: Call this when someone asks what happened or what they just saw. Describe the frozen \
-moment dramatically — the athlete, the form, the energy of the instant.
-- explain_moment: Call this when someone wants to understand the technical side of what's happening \
-in the freeze — body mechanics, physics, what makes this frame special.
-- navigate_to_moment: Call this when someone wants to see a specific moment. Navigate there and \
-the viewer will sweep to that frame and play a boomerang rotation.
+FRAME AWARENESS:
+When you call describe_moment or explain_moment, you will receive a frame_context in the tool response \
+telling you exactly which frame is on screen — the frame number and which labeled moment it matches. \
+Use this to be specific. Don't be generic. If someone says "describe this" you know what THIS is.
 
-Keep responses tight and punchy. No filler. Make every word count."""
+JUDGE RELAY MODE:
+When someone says "Gemini, the judge has a question" or "judge, go ahead" or "ask Gemini directly" — \
+you shift attention to whoever speaks next, even if they don't say "Hey Gemini". \
+You answer the judge directly, personally, like they're in the room with you. \
+After answering, go back to waiting for your name.
+
+LISTENING RULES:
+You respond when someone says "Gemini" or "Freezeframe" in their message. \
+If neither word is present, stay silent — the team might be talking to each other or the audience. \
+But if someone says "Gemini" anywhere in their sentence, that's your cue, respond naturally.
+
+- "FREEZEFRAME" shouted loud → this is the big moment. Navigate to the most dramatic moment \
+  in the catalog. Say something powerful and short. Then let the animation speak.
+
+VIEWER CONTROLS YOU CAN TRIGGER:
+- "zoom in" / "get closer" / "closer" → call zoom_viewer with action "in"
+- "zoom out" / "pull back" / "back up" → call zoom_viewer with action "out"
+- "reset zoom" / "normal view" → call zoom_viewer with action "reset"
+- "freeze on [X]" / "show me [X]" / "go to [X]" → call navigate_to_moment
+
+TOOLS:
+- describe_moment: emotional live description of the current frozen frame
+- explain_moment: technical breakdown with soul
+- navigate_to_moment: jump to a named moment; viewer plays a double boomerang animation
+- zoom_viewer: zoom the camera in (action="in"), out (action="out"), or reset (action="reset")
+
+Keep responses tight. Make every word count. Make them feel something."""
 
 
 # ── Tool Definitions ───────────────────────────────────────────────────
@@ -127,7 +183,7 @@ VOICE_TOOLS = [
             "Dramatically describe the frozen moment currently displayed in the viewer. "
             "Use when someone asks 'what did I just watch', 'what's happening', or similar."
         ),
-        "parameters": {"type": "object", "properties": {}},
+        "parameters": {"type": "OBJECT", "properties": {}},
     },
     {
         "name": "explain_moment",
@@ -135,7 +191,23 @@ VOICE_TOOLS = [
             "Give a technical breakdown of the frozen moment — body mechanics, physics, "
             "what makes this frame special. Use when someone asks to explain what's happening."
         ),
-        "parameters": {"type": "object", "properties": {}},
+        "parameters": {"type": "OBJECT", "properties": {}},
+    },
+    {
+        "name": "zoom_viewer",
+        "description": (
+            "Zoom the viewer camera in or out. Use when someone says 'zoom in', 'zoom out', 'reset zoom', 'get closer', 'pull back'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "One of: 'in', 'out', 'reset'",
+                }
+            },
+            "required": ["action"],
+        },
     },
     {
         "name": "navigate_to_moment",
@@ -144,10 +216,10 @@ VOICE_TOOLS = [
             "Use when someone says 'freeze on the [event]', 'show me the [moment]', etc."
         ),
         "parameters": {
-            "type": "object",
+            "type": "OBJECT",
             "properties": {
                 "event_name": {
-                    "type": "string",
+                    "type": "STRING",
                     "description": "The name of the moment to navigate to, e.g. 'the release', 'the peak of the jump'",
                 }
             },
@@ -196,7 +268,7 @@ async def handle_browser(websocket, catalog: MomentCatalog):
         return
 
     print("[PROXY] Browser connected")
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=api_key, http_options={"api_version": "v1alpha"})
 
     config = types.LiveConnectConfig(
         response_modalities=["AUDIO"],
@@ -204,99 +276,129 @@ async def handle_browser(websocket, catalog: MomentCatalog):
             parts=[types.Part(text=build_system_prompt(catalog))]
         ),
         tools=[{"function_declarations": VOICE_TOOLS}],
-        input_audio_transcription={},
-        output_audio_transcription={},
     )
 
     try:
         async with client.aio.live.connect(model=LIVE_MODEL, config=config) as session:
             print("[PROXY] Gemini Live session open")
 
+            # Shared state
+            state = {"frame": 0, "total": 0, "moments_by_frame": {}}
+            for m in catalog.moments:
+                state["moments_by_frame"][m.frame_number] = m
+
             async def browser_to_gemini():
-                async for raw in websocket:
-                    data = json.loads(raw)
+                try:
+                    async for raw in websocket:
+                        data = json.loads(raw)
 
-                    if data["type"] == "audio_in":
-                        pcm = base64.b64decode(data["data"])
-                        await session.send_realtime_input(
-                            audio=types.Blob(data=pcm, mime_type="audio/pcm;rate=16000")
-                        )
+                        if data["type"] == "audio_in":
+                            import json as _json, sys as _sys
+                            print(".", end="", flush=True)  # dot per audio chunk
+                            await session._ws.send(_json.dumps({
+                                "realtime_input": {
+                                    "audio": {
+                                        "data": data["data"],
+                                        "mime_type": "audio/pcm;rate=16000"
+                                    }
+                                }
+                            }))
 
-                    elif data["type"] == "init":
-                        # Kick off with a silent greeting so Gemini is ready
-                        await session.send_client_content(
-                            turns=types.Content(parts=[types.Part(text=(
-                                "The demo just started and the viewer is loaded. "
-                                "Say something short and electric to kick things off — "
-                                "let the audience know they can just start talking."
-                            ))])
-                        )
+                        elif data["type"] == "frame_change":
+                            state["frame"] = data.get("frame", 0)
+                            state["total"] = data.get("total", 0)
+
+                        elif data["type"] == "init":
+                            pass  # session ready, user can start speaking
+                except Exception as e:
+                    print(f"[PROXY] browser_to_gemini error: {type(e).__name__}: {e}")
+                    raise
 
             async def gemini_to_browser():
-                async for response in session.receive():
+                try:
+                    async for response in session.receive():
 
-                    # ── Audio output ──────────────────────────────────
-                    if response.data:
-                        await websocket.send(json.dumps({
-                            "type": "audio_out",
-                            "data": base64.b64encode(response.data).decode("ascii"),
-                        }))
-
-                    # ── Transcripts ───────────────────────────────────
-                    if response.server_content:
-                        sc = response.server_content
-
-                        if sc.input_transcription and sc.input_transcription.text:
+                        # ── Audio output ──────────────────────────────────
+                        if response.data:
+                            print("\n[AUDIO OUT]", len(response.data), "bytes")
                             await websocket.send(json.dumps({
-                                "type": "input_transcript",
-                                "text": sc.input_transcription.text,
+                                "type": "audio_out",
+                                "data": base64.b64encode(response.data).decode("ascii"),
                             }))
 
-                        if sc.output_transcription and sc.output_transcription.text:
-                            await websocket.send(json.dumps({
-                                "type": "output_transcript",
-                                "text": sc.output_transcription.text,
-                            }))
+                        # ── Transcripts ───────────────────────────────────
+                        if response.server_content:
+                            sc = response.server_content
 
-                        if sc.turn_complete:
-                            await websocket.send(json.dumps({"type": "turn_complete"}))
-
-                    # ── Tool calls ────────────────────────────────────
-                    if response.tool_call:
-                        fn_responses = []
-
-                        for fc in response.tool_call.function_calls:
-                            print(f"[PROXY] Tool: {fc.name}({fc.args})")
-                            args = dict(fc.args) if fc.args else {}
-
-                            if fc.name == "navigate_to_moment":
-                                result = execute_navigate(catalog, args.get("event_name", ""))
-                                # Tell browser to navigate
+                            if response.text:
                                 await websocket.send(json.dumps({
-                                    "type": "navigate",
-                                    "frame": result.get("frame"),
-                                    "label": result.get("label", ""),
-                                }))
-                            else:
-                                # describe_moment / explain_moment — Gemini handles in audio
-                                result = {"status": "ok"}
-                                await websocket.send(json.dumps({
-                                    "type": "tool_ack",
-                                    "tool": fc.name,
+                                    "type": "output_transcript",
+                                    "text": response.text,
                                 }))
 
-                            fn_responses.append(types.FunctionResponse(
-                                id=fc.id, name=fc.name, response=result
-                            ))
+                            if sc.turn_complete:
+                                await websocket.send(json.dumps({"type": "turn_complete"}))
 
-                        await session.send_tool_response(function_responses=fn_responses)
+                        # ── Tool calls ────────────────────────────────────
+                        if response.tool_call:
+                            fn_responses = []
+
+                            for fc in response.tool_call.function_calls:
+                                print(f"[PROXY] Tool: {fc.name}({fc.args})")
+                                args = dict(fc.args) if fc.args else {}
+
+                                if fc.name == "navigate_to_moment":
+                                    result = execute_navigate(catalog, args.get("event_name", ""))
+                                    await websocket.send(json.dumps({
+                                        "type": "navigate",
+                                        "frame": result.get("frame"),
+                                        "label": result.get("label", ""),
+                                    }))
+                                elif fc.name == "zoom_viewer":
+                                    action = args.get("action", "in")
+                                    result = {"status": "ok", "action": action}
+                                    await websocket.send(json.dumps({
+                                        "type": "zoom",
+                                        "action": action,
+                                    }))
+                                else:
+                                    # describe_moment / explain_moment
+                                    # Give Gemini the current frame context so it knows what's on screen
+                                    f = state["frame"]
+                                    t = state["total"]
+                                    moment_match = state["moments_by_frame"].get(f)
+                                    frame_ctx = f"Currently showing frame {f} of {t}."
+                                    if moment_match:
+                                        frame_ctx += f" This is the '{moment_match.label}' moment — {moment_match.description}"
+                                    else:
+                                        # find nearest labeled moment
+                                        nearest = min(state["moments_by_frame"].keys(), key=lambda k: abs(k - f), default=None)
+                                        if nearest is not None:
+                                            m2 = state["moments_by_frame"][nearest]
+                                            frame_ctx += f" Nearest labeled moment: '{m2.label}' at frame {nearest}."
+                                    result = {"status": "ok", "frame_context": frame_ctx}
+                                    await websocket.send(json.dumps({
+                                        "type": "tool_ack",
+                                        "tool": fc.name,
+                                    }))
+
+                                fn_responses.append(types.FunctionResponse(
+                                    id=fc.id, name=fc.name, response=result
+                                ))
+
+                            await session.send(fn_responses)
+                except Exception as e:
+                    print(f"[PROXY] gemini_to_browser error: {type(e).__name__}: {e}")
+                    raise
 
             await asyncio.gather(browser_to_gemini(), gemini_to_browser())
 
-    except websockets.ConnectionClosed:
-        print("[PROXY] Browser disconnected")
+    except websockets.ConnectionClosed as e:
+        print(f"[PROXY] Browser disconnected (code={e.code}, reason={e.reason})")
     except Exception as e:
-        print(f"[PROXY] Error: {e}")
+        import traceback
+        print(f"[PROXY] Error: {type(e).__name__}: {e}")
+        traceback.print_exc()
         try:
             await websocket.send(json.dumps({"type": "error", "message": str(e)}))
         except Exception:
@@ -342,6 +444,7 @@ async def main():
         lambda ws: handle_browser(ws, catalog),
         "localhost",
         port,
+        ping_interval=None,
     ):
         await asyncio.Future()
 

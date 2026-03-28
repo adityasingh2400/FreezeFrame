@@ -66,6 +66,24 @@
     </div>
   </div>
 
+  <!-- ── Live Transcript Strip ── -->
+  <div id="transcript-strip">
+    <div id="transcript-you" class="transcript-row">
+      <span class="transcript-label">YOU</span>
+      <span class="transcript-text" id="transcript-you-text"></span>
+    </div>
+    <div id="transcript-ai" class="transcript-row">
+      <span class="transcript-label">GEMINI</span>
+      <span class="transcript-text" id="transcript-ai-text"></span>
+    </div>
+  </div>
+
+  <!-- ── Debug Console ── -->
+  <div id="debug-console">
+    <div id="debug-header">LIVE TRANSCRIPT <span id="debug-toggle" onclick="document.getElementById('debug-console').classList.toggle('collapsed')">▼</span></div>
+    <div id="debug-log"></div>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

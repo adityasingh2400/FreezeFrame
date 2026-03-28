@@ -110,6 +110,7 @@ async function initViewer() {
   const camera = stripPlayer.createCamera();
 
   window.freezeframePlayer = stripPlayer;
+  window.freezeframeCamera = camera;
 
   let manifest = null;
   try {
@@ -140,6 +141,20 @@ async function initViewer() {
   renderer.setAnimationLoop(() => {
     renderer.render(scene, camera);
   });
+
+  // Report frame changes to voice layer (throttled to 4/sec)
+  let _lastFrameSent = -1;
+  let _frameThrottle = null;
+  stripPlayer.onFrameChange = (frame) => {
+    if (_frameThrottle) return;
+    _frameThrottle = setTimeout(() => {
+      _frameThrottle = null;
+      if (frame !== _lastFrameSent && window._voiceWs?.readyState === WebSocket.OPEN) {
+        _lastFrameSent = frame;
+        window._voiceWs.send(JSON.stringify({ type: 'frame_change', frame, total: stripPlayer.totalFrames }));
+      }
+    }, 250);
+  };
 
   // Start voice connection
   connectVoice().catch(err => console.error('[VOICE] connectVoice failed:', err));
