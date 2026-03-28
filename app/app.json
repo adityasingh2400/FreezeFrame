@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Sports3D",
+    "slug": "sports3d",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Sports3D needs camera access to record your sports moment.",
+          "microphonePermission": "Sports3D needs microphone access to record video."
+        }
+      ]
+    ]
+  }
+}

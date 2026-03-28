@@ -5,7 +5,7 @@ Fork of 3dReal. User records a sports moment → Gemini finds the peak frame →
 
 ## Flow
 ```
-iPhone records video
+iPhone records video (Expo app)
        ↓
 Firebase Storage upload
        ↓
@@ -18,58 +18,81 @@ nerfstudio (COLMAP + nerfacto) → orbit.mp4
 orbit.mp4 uploaded to Firebase Storage
 Firestore: sessions/{id}/status = "done", result_url = "..."
        ↓
-iOS app listener fires → plays orbit.mp4
+iOS app Firestore listener fires → plays orbit.mp4
 ```
 
 ---
 
-## Person A — iOS (Swift)
-**Base: ios/ViewController.swift + ios/AppDelegate.swift (from 3dReal)**
+## Person A — App (React Native + Expo)
+**No Xcode needed. Runs via Expo Go on any iPhone.**
 
-### What to change from 3dReal
-1. Recording duration: change 2s → 10s (sports moments need more time)
-2. After upload: save the session ID and start listening to Firestore
-3. When status == "done": open result_url in a WKWebView/AVPlayer
+### Setup (do once, ~10 min)
+1. Install Node.js: https://nodejs.org (LTS version)
+2. Install Expo Go on your iPhone from the App Store
+3. In terminal:
+   ```bash
+   cd app
+   npm install
+   ```
+
+### Firebase config (do once, ~5 min)
+1. Go to Firebase Console → your project → Project Settings → General
+2. Scroll to "Your apps" → click the web app `</>` icon (add one if none exists)
+3. Copy the `firebaseConfig` object
+4. Paste the values into `app/App.js` replacing each `"REPLACE_ME"`
+
+### Run the app
+```bash
+cd app
+npx expo start
+```
+Scan the QR code with your iPhone camera. App opens in Expo Go.
 
 ### Files
-- `ios/ViewController.swift` — see file, changes marked with `// NEW`
-- `ios/AppDelegate.swift` — copy as-is from 3dReal
-- `ios/SceneDelegate.swift` — copy as-is from 3dReal
-- `ios/Podfile` — copy from 3dReal, add WebKit pod
-
-### Steps
-- 0:00 Clone 3dReal, open in Xcode
-  - Drop in `GoogleService-Info.plist` from your Firebase project (Project Settings → iOS app)
-  - Update bundle ID in Xcode (Signing & Capabilities) to match your provisioning profile
-- 0:15 Get camera recording + upload working (already works in 3dReal)
-- 0:30 Add Firestore listener for result (see ViewController.swift `// NEW` sections)
-- 1:00 Add result screen (AVPlayerViewController for orbit video)
-- 1:30 Test end-to-end with Person B
+- `app/App.js` — full app, Firebase config at top
+- `app/package.json` — dependencies
+- `app/app.json` — Expo config
 
 ---
 
-## Person B — Backend (Python)
-**Base: backend/server.py (from 3dReal's server_to_nerf.py)**
+## Person B — Backend (Python, runs on RunPod A100)
+**Base: 3dReal's server_to_nerf.py + Gemini peak detection + nerfstudio**
 
-### What to change from 3dReal
-1. Add Gemini peak moment detection before COLMAP
-2. Replace instant-ngp.exe (Windows) with nerfstudio (Linux/RunPod)
-3. Upload orbit.mp4 result + write to Firestore when done
+### Setup (do once, ~10 min)
+SSH into RunPod:
+```bash
+ssh -i ~/.ssh/id_ed25519 -tt doecnb8ahnckjj-644112f8@ssh.runpod.io
+cd /workspace
+git clone https://github.com/adityasingh2400/Replay -b pivot
+cd Replay/backend
+pip install -r requirements.txt   # runs in background ~5 min
+```
+
+Drop in credentials:
+- `serviceAccountKey.json` — Firebase Console → Project Settings → Service Accounts → Generate new key → download JSON → scp to RunPod
+- Update `server.py` line 23: replace `YOUR_BUCKET.appspot.com` with your bucket name (found in Firebase Console → Storage)
+- `export GEMINI_API_KEY=your_key`
+
+### Run
+```bash
+python server.py
+```
+
+### START PRE-RUN AT MINUTE 45
+nerfstudio takes ~15 min on A100. Run the pipeline on a pre-recorded sports clip now so you have a result ready for the demo:
+```bash
+python -c "
+from server import process_session
+import os
+os.makedirs('data/demo', exist_ok=True)
+# put a sports .mov in data/demo/ first, then:
+process_session('demo', 'data/demo')
+"
+```
 
 ### Files
-- `backend/server.py` — see file, new sections marked with `# NEW`
-- `backend/requirements.txt` — updated deps
-
-### Steps
-- 0:00 SSH into RunPod, `pip install nerfstudio google-generativeai` (runs in background ~5 min)
-- 0:15 Copy server.py to RunPod
-  - Drop in `serviceAccountKey.json` (Firebase Console → Project Settings → Service Accounts → Generate new key)
-  - Update bucket name in server.py line 23 to your Firebase Storage bucket
-  - `export GEMINI_API_KEY=your_key`
-- 0:30 Test Gemini peak moment function on a sample video
-- 0:45 **START PRE-RUN**: run full pipeline on a pre-recorded sports clip now (takes ~15 min on A100)
-- 1:00 Test nerfstudio render output
-- 1:30 Connect to Person A's app, test full loop
+- `backend/server.py` — full pipeline, changes from 3dReal marked `# NEW`
+- `backend/requirements.txt`
 
 ---
 
@@ -77,12 +100,11 @@ iOS app listener fires → plays orbit.mp4
 ```
 sessions/{sessionId}/
   status:     "processing" | "done"
-  result_url: "https://firebasestorage..."   ← orbit video download URL
+  result_url: "https://firebasestorage..."
 ```
-sessionId = the timestamp string from the upload path (e.g. "202403171406530")
+sessionId = 14-char timestamp string (auto-generated by app, matches backend)
 
 ---
 
 ## Demo fallback
-nerfstudio takes ~15 min on A100. Person B starts a pre-run at minute 45.
-For the live demo, tap "Load Demo" to show the pre-computed result instantly.
+Pre-run result is in Firestore under session ID `"demo"`. If live pipeline is slow, hardcode `sessionId = "demo"` in `listenForResult()` in App.js to show the pre-computed result instantly.
