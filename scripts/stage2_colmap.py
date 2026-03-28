@@ -43,13 +43,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import load_config, resolve_path
 
 
-def collect_images_for_colmap(images_dir: Path, strategy: str = "one_per_cam") -> list[Path]:
+def collect_images_for_colmap(images_dir: Path, strategy: str = "one_per_cam", n_per_cam: int = 5) -> list[Path]:
     """Collect images for COLMAP processing.
 
     Args:
         images_dir: scene/images/ containing cam00/, cam01/, etc.
-        strategy: "one_per_cam" uses frame_00000 from each camera (fast, recommended).
-                  "all" feeds every frame (slow, only if one_per_cam fails).
+        strategy: "one_per_cam"  — 1 frame per camera (fast, may fail on wide-angle setups)
+                  "n_per_cam"    — N evenly spaced frames per camera (default N=5, recommended)
+                  "all"          — every frame (slow, 320+ images)
+        n_per_cam: number of frames per camera for "n_per_cam" strategy
 
     Returns list of image paths sorted by camera then frame.
     """
@@ -59,8 +61,7 @@ def collect_images_for_colmap(images_dir: Path, strategy: str = "one_per_cam") -
         sys.exit(1)
 
     def get_frames(cam_dir: Path) -> list[Path]:
-        frames = sorted(cam_dir.glob("frame_*.png")) or sorted(cam_dir.glob("frame_*.jpg"))
-        return frames
+        return sorted(cam_dir.glob("frame_*.png")) or sorted(cam_dir.glob("frame_*.jpg"))
 
     images = []
     if strategy == "one_per_cam":
@@ -70,11 +71,20 @@ def collect_images_for_colmap(images_dir: Path, strategy: str = "one_per_cam") -
                 print(f"FAIL: no frames in {cam_dir}")
                 sys.exit(1)
             images.append(frames[0])
+    elif strategy == "n_per_cam":
+        for cam_dir in cam_dirs:
+            frames = get_frames(cam_dir)
+            if not frames:
+                print(f"FAIL: no frames in {cam_dir}")
+                sys.exit(1)
+            # Pick N evenly spaced frames across the sequence
+            indices = [int(i * (len(frames) - 1) / (n_per_cam - 1)) for i in range(n_per_cam)] if len(frames) >= n_per_cam else list(range(len(frames)))
+            images.extend(frames[i] for i in indices)
     else:  # "all"
         for cam_dir in cam_dirs:
             images.extend(get_frames(cam_dir))
 
-    print(f"  Collected {len(images)} images ({strategy} strategy)")
+    print(f"  Collected {len(images)} images ({strategy} strategy, n_per_cam={n_per_cam})")
     return images
 
 
@@ -327,10 +337,16 @@ def run():
     )
     parser.add_argument(
         "--strategy",
-        choices=["one_per_cam", "all"],
-        default="one_per_cam",
-        help="Image collection strategy. 'one_per_cam' uses only frame_00000 per camera (default, fast). "
-             "'all' feeds every frame (slower, use if one_per_cam fails to reconstruct).",
+        choices=["one_per_cam", "n_per_cam", "all"],
+        default="n_per_cam",
+        help="Image collection strategy. 'n_per_cam' picks N evenly spaced frames per camera (default). "
+             "'one_per_cam' uses only frame_00000. 'all' feeds every frame (slow).",
+    )
+    parser.add_argument(
+        "--n-per-cam",
+        type=int,
+        default=5,
+        help="Number of frames per camera for --strategy n_per_cam (default: 5).",
     )
     args = parser.parse_args()
 
@@ -357,7 +373,7 @@ def run():
         print(f"  WARNING: metadata.json not found, counted {num_cameras} cameras from directories.")
 
     # Collect images
-    image_list = collect_images_for_colmap(images_dir, strategy=args.strategy)
+    image_list = collect_images_for_colmap(images_dir, strategy=args.strategy, n_per_cam=args.n_per_cam)
 
     # Working dirs
     work_dir = sparse_dir.parent.parent / "colmap_workspace"
