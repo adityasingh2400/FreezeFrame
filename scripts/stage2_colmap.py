@@ -163,7 +163,11 @@ def run_colmap_mapper(database_path: Path, image_root: Path, output_dir: Path):
         "--database_path", str(database_path),
         "--image_path", str(image_root),
         "--output_path", str(output_dir),
-        "--Mapper.min_num_matches", "15",
+        "--Mapper.min_num_matches", "10",
+        "--Mapper.init_min_num_inliers", "10",
+        "--Mapper.init_min_tri_angle", "2",
+        "--Mapper.abs_pose_min_num_inliers", "10",
+        "--Mapper.abs_pose_min_inlier_ratio", "0.05",
     ]
     result = subprocess.run(cmd)
     if result.returncode != 0:
