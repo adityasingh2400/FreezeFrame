@@ -74,79 +74,98 @@ def collect_images_for_colmap(images_dir: Path, strategy: str = "one_per_cam") -
     return images
 
 
-def run_colmap_feature_extraction(image_list: list[Path], database_path: Path, image_root: Path):
-    """Run COLMAP feature extraction on the image list.
+def find_colmap_bin() -> str:
+    """Find the COLMAP binary, checking common install locations."""
+    candidates = [
+        shutil.which("colmap"),          # on PATH
+        "/usr/bin/colmap",               # apt install colmap
+        "/usr/local/bin/colmap",         # build from source
+        r"C:\Users\gerad\Projects\colmap-x64-windows-nocuda\bin\colmap.exe",  # Windows dev
+    ]
+    for c in candidates:
+        if c and Path(c).exists():
+            return c
+    print("FAIL: colmap binary not found. Install with: apt install colmap")
+    sys.exit(1)
 
-    Writes features into database_path. image_root must be the common ancestor
-    of all image paths (used as the COLMAP image root for relative path tracking).
-    """
+
+def run_colmap_feature_extraction(image_list: list[Path], database_path: Path, image_root: Path):
+    """Run COLMAP feature extraction via the binary."""
     database_path.parent.mkdir(parents=True, exist_ok=True)
+    colmap_bin = find_colmap_bin()
+
+    # Write image list to a temp file for --image_list flag
+    image_list_file = database_path.parent / "image_list.txt"
+    with open(image_list_file, "w") as f:
+        for p in image_list:
+            f.write(str(p.relative_to(image_root)) + "\n")
 
     print("  Running feature extraction...")
-    pycolmap.extract_features(
-        database_path=database_path,
-        image_path=image_root,
-        image_names=[str(p.relative_to(image_root)) for p in image_list],
-        device=pycolmap.Device.auto,
-    )
+    cmd = [
+        colmap_bin, "feature_extractor",
+        "--database_path", str(database_path),
+        "--image_path", str(image_root),
+        "--image_list_path", str(image_list_file),
+        "--ImageReader.single_camera_per_folder", "1",
+        "--SiftExtraction.use_gpu", "1",
+    ]
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        print(f"FAIL: feature_extractor exited {result.returncode}")
+        sys.exit(1)
     print("  Feature extraction done.")
 
 
 def run_colmap_matching(database_path: Path):
-    """Run COLMAP exhaustive matching via the binary.
-
-    Uses the colmap binary instead of pycolmap — pycolmap's match_exhaustive
-    crashes on large image sets when writing matches to the database.
-    Falls back to pycolmap only if the binary is not on PATH.
-    """
-    colmap_bin = shutil.which("colmap")
-
-    if colmap_bin:
-        print("  Running exhaustive feature matching (colmap binary)...")
-        cmd = [
-            colmap_bin, "exhaustive_matcher",
-            "--database_path", str(database_path),
-            "--SiftMatching.use_gpu", "1",
-        ]
-        result = subprocess.run(cmd, capture_output=False)
-        if result.returncode != 0:
-            print(f"  WARNING: colmap binary matcher exited {result.returncode}, trying pycolmap fallback...")
-            pycolmap.match_exhaustive(database_path=database_path, device=pycolmap.Device.auto)
-    else:
-        print("  Running exhaustive feature matching (pycolmap fallback — binary not found)...")
-        pycolmap.match_exhaustive(database_path=database_path, device=pycolmap.Device.auto)
-
+    """Run COLMAP exhaustive matching via the binary."""
+    colmap_bin = find_colmap_bin()
+    print("  Running exhaustive feature matching...")
+    cmd = [
+        colmap_bin, "exhaustive_matcher",
+        "--database_path", str(database_path),
+        "--SiftMatching.use_gpu", "1",
+    ]
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        print(f"FAIL: exhaustive_matcher exited {result.returncode}")
+        sys.exit(1)
     print("  Matching done.")
 
 
 def run_colmap_mapper(database_path: Path, image_root: Path, output_dir: Path):
-    """Run COLMAP sparse mapper to recover camera poses.
+    """Run COLMAP sparse mapper via the binary.
 
     Output: cameras.bin, images.bin, points3D.bin in output_dir/0/
+    Returns the path to the best reconstruction folder and a pycolmap Reconstruction object.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    mapper_options = pycolmap.IncrementalPipelineOptions()
-    mapper_options.min_num_matches = 15  # relax slightly for small camera counts
+    colmap_bin = find_colmap_bin()
 
     print("  Running COLMAP sparse mapper (this may take a few minutes)...")
-    reconstructions = pycolmap.incremental_mapping(
-        database_path=str(database_path),
-        image_path=str(image_root),
-        output_path=str(output_dir),
-        options=mapper_options,
-    )
+    cmd = [
+        colmap_bin, "mapper",
+        "--database_path", str(database_path),
+        "--image_path", str(image_root),
+        "--output_path", str(output_dir),
+        "--Mapper.min_num_matches", "15",
+    ]
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        print(f"FAIL: mapper exited {result.returncode}")
+        sys.exit(1)
 
-    if not reconstructions:
+    # Find the largest reconstruction folder (0/, 1/, ...)
+    recon_dirs = sorted(output_dir.iterdir(), key=lambda p: int(p.name) if p.name.isdigit() else 999)
+    if not recon_dirs:
         print("FAIL: COLMAP mapper produced no reconstructions.")
         print("  Try: fewer frames, better lighting, or wider camera spread.")
         sys.exit(1)
 
-    # COLMAP may produce multiple reconstructions — pick the largest
-    best = max(reconstructions.values(), key=lambda r: r.num_reg_images())
-    best_id = max(reconstructions, key=lambda k: reconstructions[k].num_reg_images())
-    print(f"  Mapper done. Best reconstruction: {best.num_reg_images()} registered images.")
-    return best_id, best
+    # Pick the one with the most registered images (largest images.bin)
+    best_dir = max(recon_dirs, key=lambda p: (p / "images.bin").stat().st_size if (p / "images.bin").exists() else 0)
+    reconstruction = pycolmap.Reconstruction(str(best_dir))
+    print(f"  Mapper done. Best reconstruction: {reconstruction.num_reg_images()} registered images (folder {best_dir.name}).")
+    return best_dir, reconstruction
 
 
 def verify_poses(reconstruction, expected_cameras: int) -> bool:
