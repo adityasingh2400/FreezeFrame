@@ -48,6 +48,8 @@ gemini:
   model: "gemini-2.0-flash-live-001"
 
 cloud:
-  host: "TBD"
-  workspace: "/workspace/replay"
+  host: "195.26.233.82"
+  port: 26142
+  user: "root"
+  workspace: "/workspace/Replay"
   gpu: "A100"

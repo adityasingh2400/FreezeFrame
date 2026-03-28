@@ -5,9 +5,9 @@ opencv-python
 Pillow
 
 # Stage 2: COLMAP
-# COLMAP itself is installed via apt (not pip)
-# pip deps for LLFF conversion:
-# numpy (already above)
+# COLMAP binary: apt install colmap (Linux cloud box) or download from github.com/colmap/colmap/releases (Windows)
+# pycolmap wraps COLMAP C++ for sparse steps (extraction, matching, mapper) — no binary needed for these
+pycolmap
 
 # Stage 3: 4DGaussians
 # 4DGS has its own requirements — install separately in the 4DGS repo clone
