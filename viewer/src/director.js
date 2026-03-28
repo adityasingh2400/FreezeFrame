@@ -60,16 +60,14 @@ export class DirectorMode {
     this._startTime = performance.now();
     this._controls.controls.enabled = false;
     this._player.play();
-    this._btn.textContent = 'Exit Director';
-    this._btn.classList.add('active');
+    if (this._btn) this._btn.classList.add('active');
   }
 
   stop() {
     this._active = false;
     this._controls.controls.enabled = true;
     this._player.pause();
-    this._btn.textContent = 'Director Mode';
-    this._btn.classList.remove('active');
+    if (this._btn) this._btn.classList.remove('active');
   }
 
   toggle() {
@@ -112,39 +110,7 @@ export class DirectorMode {
   }
 
   _createToggleButton() {
-    this._btn = document.createElement('button');
-    this._btn.id = 'director-btn';
-    this._btn.textContent = 'Director Mode';
-    this._btn.style.cssText = `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 12px;
-      font-weight: 500;
-      padding: 8px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: inherit;
-      z-index: 20;
-      transition: all 0.2s;
-      letter-spacing: 0.05em;
-      pointer-events: auto;
-    `;
-    this._btn.addEventListener('mouseenter', () => {
-      this._btn.style.background = 'rgba(255, 255, 255, 0.14)';
-      this._btn.style.color = '#fff';
-    });
-    this._btn.addEventListener('mouseleave', () => {
-      if (!this._active) {
-        this._btn.style.background = 'rgba(255, 255, 255, 0.08)';
-        this._btn.style.color = 'rgba(255, 255, 255, 0.6)';
-      }
-    });
-    this._btn.addEventListener('click', () => this.toggle());
-    document.body.appendChild(this._btn);
+    // Use the button already in the HTML header — do not create a duplicate
+    this._btn = document.getElementById('director-btn');
   }
 }

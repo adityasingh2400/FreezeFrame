@@ -60,7 +60,7 @@ export class Timeline {
   }
 
   _updateFrameCounter(frame) {
-    this._frameCounter.textContent = `${frame + 1} / ${this._player.totalFrames}`;
+    this._frameCounter.textContent = String(frame).padStart(3, '0');
   }
 
   setActiveSpeed(speed) {

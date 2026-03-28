@@ -26,7 +26,7 @@ async function init() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x0a0a0a);
+  renderer.setClearColor(0x0a0a0f);
 
   const scene = new THREE.Scene();
 
@@ -40,8 +40,6 @@ async function init() {
 
   const cameraCtrl = new CameraController(camera, canvas);
 
-  canvas.addEventListener('pointerdown', () => cameraCtrl.onUserInteract());
-
   const player = new SplatPlayer(scene);
   const timeline = new Timeline(player);
 
@@ -49,6 +47,8 @@ async function init() {
   let splatCount = 0;
 
   if (manifest && manifest.frames && manifest.frames.length > 0) {
+    const sceneName = manifest.name || manifest.frames[0].split('/').pop().replace(/\.\w+$/, '');
+    ui.setSceneName(sceneName);
     ui.setLoadingText(`Loading ${manifest.frames.length} frames...`);
     const baseDir = manifest.baseDir || '/frames/';
     const urls = manifest.frames.map(f => baseDir + f);
@@ -56,6 +56,7 @@ async function init() {
       ui.setLoadingProgress(loaded, total);
     });
   } else {
+    ui.setSceneName('nike.splat — demo');
     ui.setLoadingText('Loading demo scene...');
     ui.setLoadingProgress(50, 100);
     splatCount = await player.loadSingle(DEMO_SPLAT);
@@ -70,6 +71,27 @@ async function init() {
   if (player.totalFrames > 1) {
     director.loadDefault(player.totalFrames, player.fps);
   }
+
+  // Director button
+  const directorBtn = document.getElementById('director-btn');
+  if (directorBtn) {
+    directorBtn.addEventListener('click', () => {
+      director.toggle();
+      ui.setDirectorActive(director.active);
+    });
+  }
+
+  // Prev/next frame buttons
+  const prevBtn = document.getElementById('prev-btn');
+  const nextBtn = document.getElementById('next-btn');
+  if (prevBtn) prevBtn.addEventListener('click', () => { player.pause(); player.stepFrame(-1); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { player.pause(); player.stepFrame(1); });
+
+  // Dismiss orbit hint on first interaction
+  canvas.addEventListener('pointerdown', () => {
+    cameraCtrl.onUserInteract();
+    ui.dismissOrbitHint();
+  }, { once: true });
 
   // Keyboard shortcuts
   window.addEventListener('keydown', (e) => {
@@ -101,6 +123,8 @@ async function init() {
       case 'KeyD':
         e.preventDefault();
         director.toggle();
+        ui.setDirectorActive(director.active);
+        ui.dismissOrbitHint();
         break;
     }
   });
@@ -111,13 +135,28 @@ async function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
+  // Sort frequency control — skip renderer.render() (and Spark's Gaussian depth sort)
+  // when the camera has barely moved, capping skips at MAX_SKIP_MS for safety.
+  const SORT_ANGLE_THRESHOLD = 0.02; // radians (~1.1°)
+  const MAX_SKIP_MS = 150;
+  const _lastSortQuat = new THREE.Quaternion();
+  let _lastSortTime = 0;
+
   function animate(timestamp) {
     player.update(timestamp);
     director.update(timestamp);
     cameraCtrl.update();
     timeline.update();
     ui.updateFps(timestamp);
-    renderer.render(scene, camera);
+
+    const angleDelta = _lastSortQuat.angleTo(camera.quaternion);
+    const timeSinceSort = timestamp - _lastSortTime;
+
+    if (angleDelta >= SORT_ANGLE_THRESHOLD || timeSinceSort >= MAX_SKIP_MS) {
+      renderer.render(scene, camera);
+      _lastSortQuat.copy(camera.quaternion);
+      _lastSortTime = timestamp;
+    }
   }
 
   renderer.setAnimationLoop(animate);
@@ -125,6 +164,6 @@ async function init() {
 
 init().catch(err => {
   console.error('Replay viewer failed to initialize:', err);
-  const loadingText = document.getElementById('loading-text');
-  if (loadingText) loadingText.textContent = `Error: ${err.message}`;
+  const ui = new UI();
+  ui.showError(err.message || 'Unknown error');
 });

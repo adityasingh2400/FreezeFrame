@@ -2,22 +2,42 @@ export class UI {
   constructor() {
     this._loadingScreen = document.getElementById('loading-screen');
     this._loadingFill = document.getElementById('loading-bar-fill');
+    this._loadingPct = document.getElementById('loading-pct');
     this._loadingText = document.getElementById('loading-text');
+    this._errorScreen = document.getElementById('error-screen');
+    this._errorMessage = document.getElementById('error-message');
     this._fpsCounter = document.getElementById('fps-counter');
     this._splatCounter = document.getElementById('splat-counter');
+    this._sceneName = document.getElementById('scene-name');
+    this._orbitHint = document.getElementById('orbit-hint');
+    this._directorBtn = document.getElementById('director-btn');
     this._frameCount = 0;
     this._lastFpsUpdate = 0;
     this._fps = 0;
+    this._hintDismissed = false;
   }
 
   setLoadingProgress(loaded, total) {
     const pct = Math.round((loaded / total) * 100);
     this._loadingFill.style.width = `${pct}%`;
+    if (this._loadingPct) this._loadingPct.textContent = `${pct}%`;
     this._loadingText.textContent = `Loading frames... ${loaded} / ${total}`;
   }
 
   setLoadingText(text) {
     this._loadingText.textContent = text;
+  }
+
+  setSceneName(name) {
+    if (this._sceneName) this._sceneName.textContent = name;
+  }
+
+  showError(message) {
+    if (this._loadingScreen) {
+      this._loadingScreen.classList.add('hidden');
+    }
+    if (this._errorMessage) this._errorMessage.textContent = message;
+    if (this._errorScreen) this._errorScreen.classList.add('visible');
   }
 
   hideLoading() {
@@ -30,6 +50,19 @@ export class UI {
   setSplatCount(count) {
     const formatted = count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count;
     this._splatCounter.textContent = `${formatted} splats`;
+  }
+
+  dismissOrbitHint() {
+    if (!this._hintDismissed && this._orbitHint) {
+      this._hintDismissed = true;
+      this._orbitHint.classList.add('dismissed');
+    }
+  }
+
+  setDirectorActive(active) {
+    if (this._directorBtn) {
+      this._directorBtn.classList.toggle('active', active);
+    }
   }
 
   updateFps(timestamp) {

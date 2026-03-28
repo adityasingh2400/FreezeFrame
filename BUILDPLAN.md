@@ -279,8 +279,8 @@ Hour 5-6      Load trained model into viewer
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | SELECTIVE mode, 5 proposals, 2 accepted (Mia→viewer owner, early COLMAP validation), 0 critical gaps |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 2 issues (demo offline fallback resolved, config DRY→utils.py), 0 critical gaps |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL) | score: 3/10 → 9/10, 4 decisions made |
 
 - **OUTSIDE VOICE:** Claude subagent found 10 issues in CEO review. Most critical: Mia needs a deliverable (fixed), COLMAP needs early validation (fixed), .ply export is real engineering (acknowledged).
 - **UNRESOLVED:** 0
-- **VERDICT:** CEO + ENG CLEARED — ready to implement.
+- **VERDICT:** CEO + ENG + DESIGN CLEARED — ready to implement.

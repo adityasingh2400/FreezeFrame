@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Replay — 4D Sports Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles.css" />
 </head>
 <body>
@@ -12,44 +15,87 @@
   <div id="overlay">
     <div id="header">
       <div id="logo">REPLAY</div>
-      <div id="camera-presets">
-        <button class="preset-btn active" data-preset="free">Free</button>
-        <button class="preset-btn" data-preset="front">Front</button>
-        <button class="preset-btn" data-preset="side">Side</button>
-        <button class="preset-btn" data-preset="top">Top</button>
+      <div id="scene-name"></div>
+      <div id="header-right">
+        <div id="camera-presets">
+          <button class="preset-btn active" data-preset="free">Free</button>
+          <button class="preset-btn" data-preset="front">Front</button>
+          <button class="preset-btn" data-preset="side">Side</button>
+          <button class="preset-btn" data-preset="top">Top</button>
+        </div>
+        <button id="director-btn" aria-label="Toggle director mode (auto orbit)">
+          <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="10" cy="10" r="7"/>
+            <path d="M8 7l5 3-5 3V7z" fill="currentColor" stroke="none"/>
+          </svg>
+          Director
+        </button>
       </div>
     </div>
 
-    <div id="loading-screen">
+    <!-- Loading Screen -->
+    <div id="loading-screen" role="status" aria-live="polite">
       <div id="loading-content">
         <div id="loading-title">REPLAY</div>
-        <div id="loading-bar-track">
+        <div id="loading-ring" aria-hidden="true"></div>
+        <div id="loading-pct">0%</div>
+        <div id="loading-bar-track" aria-hidden="true">
           <div id="loading-bar-fill"></div>
         </div>
-        <div id="loading-text">Loading scene...</div>
+        <div id="loading-text">Initializing...</div>
       </div>
     </div>
 
-    <div id="controls-bar">
-      <button id="play-btn" title="Space to play/pause">
-        <svg id="icon-play" viewBox="0 0 24 24" width="20" height="20"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
-        <svg id="icon-pause" viewBox="0 0 24 24" width="20" height="20" style="display:none"><rect x="5" y="3" width="4" height="18" fill="currentColor"/><rect x="15" y="3" width="4" height="18" fill="currentColor"/></svg>
-      </button>
-      <div id="timeline-container">
-        <input type="range" id="timeline" min="0" max="1" step="1" value="0" />
+    <!-- Error Screen -->
+    <div id="error-screen" aria-live="assertive">
+      <div id="error-content">
+        <div id="error-icon" aria-hidden="true">⚠</div>
+        <div id="error-title">Failed to load scene</div>
+        <div id="error-message"></div>
+        <div id="error-hint">Check the browser console for details.</div>
+        <button id="error-reload-btn" onclick="window.location.reload()">Reload</button>
       </div>
-      <div id="frame-info">
-        <span id="frame-counter">0 / 0</span>
+    </div>
+
+    <!-- Orbit hint -->
+    <div id="orbit-hint" aria-label="Controls: drag to orbit, scroll to zoom">
+      <span><kbd>drag</kbd> Orbit</span>
+      <span><kbd>scroll</kbd> Zoom</span>
+      <span><kbd>shift+drag</kbd> Pan</span>
+      <span><kbd>D</kbd> Director</span>
+    </div>
+
+    <!-- Controls Bar -->
+    <div id="controls-bar">
+      <div id="frame-block">
+        <div id="frame-counter" aria-label="Current frame">000</div>
+        <div id="frame-label">Frame</div>
+      </div>
+      <div id="playback-controls">
+        <button class="skip-btn" id="prev-btn" aria-label="Previous frame">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M3 3h1.5v10H3V3zm9.5 0L5 8l7.5 5V3z"/></svg>
+        </button>
+        <button id="play-btn" aria-label="Play or pause (Space)">
+          <svg id="icon-play" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+          <svg id="icon-pause" viewBox="0 0 24 24" width="18" height="18" style="display:none" aria-hidden="true"><rect x="5" y="3" width="4" height="18" fill="currentColor"/><rect x="15" y="3" width="4" height="18" fill="currentColor"/></svg>
+        </button>
+        <button class="skip-btn" id="next-btn" aria-label="Next frame">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M11.5 3H13v10h-1.5V3zM3.5 3l7.5 5-7.5 5V3z"/></svg>
+        </button>
+      </div>
+      <div id="timeline-container">
+        <input type="range" id="timeline" min="0" max="1" step="1" value="0"
+          aria-label="Timeline scrubber" />
       </div>
       <div id="speed-control">
-        <button class="speed-btn" data-speed="0.25">0.25x</button>
-        <button class="speed-btn" data-speed="0.5">0.5x</button>
-        <button class="speed-btn active" data-speed="1">1x</button>
-        <button class="speed-btn" data-speed="2">2x</button>
+        <button class="speed-btn" data-speed="0.25" aria-label="0.25x speed">0.25×</button>
+        <button class="speed-btn" data-speed="0.5" aria-label="0.5x speed">0.5×</button>
+        <button class="speed-btn active" data-speed="1" aria-label="1x speed">1×</button>
+        <button class="speed-btn" data-speed="2" aria-label="2x speed">2×</button>
       </div>
     </div>
 
-    <div id="stats">
+    <div id="stats" aria-live="off" aria-atomic="true">
       <span id="fps-counter"></span>
       <span id="splat-counter"></span>
     </div>

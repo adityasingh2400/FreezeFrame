@@ -20,6 +20,10 @@ gaps/gap_meta.json
 gaps/anchor_views/*.png
 gaps/repaired_views/*.png
 
+# Node
+node_modules/
+dist/
+
 # Environment
 .env
 __pycache__/
@@ -44,3 +48,4 @@ Thumbs.db
 
 # Keep gitkeep files
 !.gitkeep
+.gstack/
