@@ -271,20 +271,38 @@ def convert_colmap_to_llff(reconstruction, output_path: Path):
     print(f"  LLFF poses_bounds.npy saved: shape {poses_bounds.shape} → {output_path}")
 
 
-def run_dense_reconstruction(image_root: Path, sparse_src: Path, dense_dir: Path):
+def colmap_has_cuda() -> bool:
+    """Return True if the installed COLMAP binary was compiled with CUDA support."""
+    colmap_bin = shutil.which("colmap")
+    if colmap_bin is None:
+        return False
+    try:
+        result = subprocess.run([colmap_bin, "-h"], capture_output=True, text=True)
+        output = result.stdout + result.stderr
+        return "without CUDA" not in output
+    except Exception:
+        return False
+
+
+def run_dense_reconstruction(image_root: Path, sparse_src: Path, dense_dir: Path) -> bool:
     """Run COLMAP dense reconstruction: undistort → patch_match_stereo → stereo_fusion.
 
-    Requires the COLMAP binary (colmap / colmap.exe) on PATH.
-    Produces dense_dir/fused.ply — the dense point cloud 4DGS wants.
+    Requires the COLMAP binary (colmap / colmap.exe) on PATH, compiled with CUDA.
+    Produces dense_dir/fused.ply — optional denser point cloud for 4DGS init.
 
-    Skip on Windows with --sparse-only; run on the cloud box where GPU is available.
+    Returns True on success, False if skipped due to missing CUDA support.
+    Note: 4DGS works with sparse point cloud (points3D.bin) alone — dense is optional.
     """
     colmap_bin = shutil.which("colmap")
     if colmap_bin is None:
-        print("FAIL: 'colmap' binary not found on PATH.")
-        print("  Linux:   apt install colmap")
-        print("  Windows: download from github.com/colmap/colmap/releases and add to PATH")
-        sys.exit(1)
+        print("  SKIP dense: 'colmap' binary not found on PATH.")
+        return False
+
+    if not colmap_has_cuda():
+        print("  SKIP dense: COLMAP was built without CUDA (apt package limitation).")
+        print("    → sparse point cloud (points3D.bin) is sufficient for 4DGS training.")
+        print("    → For dense, install CUDA COLMAP: https://github.com/colmap/colmap/releases")
+        return False
 
     dense_dir.mkdir(parents=True, exist_ok=True)
 
@@ -326,6 +344,7 @@ def run_dense_reconstruction(image_root: Path, sparse_src: Path, dense_dir: Path
     if fused.exists():
         size_mb = fused.stat().st_size / 1e6
         print(f"  Dense point cloud: {fused}  ({size_mb:.1f} MB)")
+        return True
     else:
         print("FAIL: fused.ply not produced by stereo_fusion.")
         sys.exit(1)
@@ -405,22 +424,26 @@ def run():
     # LLFF export
     convert_colmap_to_llff(reconstruction, poses_path)
 
-    # Dense reconstruction (cloud box only — needs COLMAP binary + GPU)
+    # Dense reconstruction (optional — needs COLMAP binary compiled with CUDA)
+    dense_ok = False
     if not args.sparse_only:
         dense_dir = sparse_dir.parent.parent / "dense"
-        run_dense_reconstruction(image_root, src, dense_dir)
-        # Copy fused.ply to output location Aditya expects
-        fused_dest = sparse_dir.parent.parent / "output" / "fused.ply"
-        fused_dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(dense_dir / "fused.ply", fused_dest)
-        print(f"  Dense point cloud: {fused_dest}")
+        dense_ok = run_dense_reconstruction(image_root, src, dense_dir)
+        if dense_ok:
+            # Copy fused.ply to output location Aditya expects
+            fused_dest = sparse_dir.parent.parent / "output" / "fused.ply"
+            fused_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(dense_dir / "fused.ply", fused_dest)
+            print(f"  Dense point cloud: {fused_dest}")
 
     print()
     print("Stage 2 complete.")
     print(f"  COLMAP sparse: {sparse_dir}/{{cameras,images,points3D}}.bin")
     print(f"  LLFF:          {poses_path}")
-    if not args.sparse_only:
+    if dense_ok:
         print(f"  Dense PLY:     output/fused.ply")
+    else:
+        print(f"  Dense PLY:     skipped (sparse point cloud sufficient for 4DGS)")
     print("  Run 'make validate-b' to verify Contract B.")
 
 
