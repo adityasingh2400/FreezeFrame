@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ImageStripPlayer } from './image-strip-player.js';
+import { connectVoice } from './gemini_live.js';
 
 const MANIFEST_PATH = '/manifest.json';
 
@@ -139,6 +140,9 @@ async function initViewer() {
   renderer.setAnimationLoop(() => {
     renderer.render(scene, camera);
   });
+
+  // Start voice connection
+  connectVoice().catch(err => console.error('[VOICE] connectVoice failed:', err));
 }
 
 // ── Agent / Listening Indicator State ────────────────────────────────

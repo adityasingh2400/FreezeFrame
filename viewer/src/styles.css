@@ -594,3 +594,56 @@ canvas#viewport.visible {
   0%, 100% { height: 7px; }
   50%       { height: 42px; }
 }
+
+/* ── Viewer Overlay Text ── */
+#viewer-overlay-text {
+  position: absolute;
+  bottom: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 640px;
+  width: max-content;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  padding: 10px 20px;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#viewer-overlay-text.visible {
+  opacity: 1;
+}
+
+#viewer-overlay-text[data-mode="output"] {
+  color: var(--bg);
+  background: rgba(122, 27, 45, 0.75);
+}
+
+#viewer-overlay-text[data-mode="input"] {
+  color: var(--text-dim);
+  background: rgba(42, 10, 16, 0.4);
+  font-size: 13px;
+}
+
+#viewer-overlay-text[data-mode="navigate"] {
+  color: var(--bg);
+  background: rgba(122, 27, 45, 0.85);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+#viewer-overlay-text[data-mode="error"] {
+  color: var(--bg);
+  background: rgba(80, 10, 10, 0.85);
+  font-size: 13px;
+}
