@@ -225,7 +225,8 @@ QUAL_ITER=$(ls -1 "$QUAL_MODEL/point_cloud/" 2>/dev/null | grep "iteration_" | s
 python3 export_perframe_3DGS.py \
     --iteration "$QUAL_ITER" \
     --configs arguments/multipleview/replay.py \
-    --model_path "$QUAL_MODEL"
+    --model_path "$QUAL_MODEL" \
+    --num_frames 80
 
 QUAL_EXPORT="$QUAL_MODEL/gaussian_pertimestamp"
 QUAL_COUNT=$(ls "$QUAL_EXPORT"/time_*.ply 2>/dev/null | wc -l)

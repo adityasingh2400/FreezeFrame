@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 """Restructure Divij's COLMAP output into the 4DGS MultipleView format.
 
-Divij ran COLMAP with multi-frame input (15 frames × 3 cameras = 45 images).
+Divij ran COLMAP with multi-frame input (15 frames × 4 cameras = 48 images).
 The 4DGS MultipleView loader expects ONE image per camera named `imageN.jpg`,
 where N is the camera number. The loader then reads all frames from `camNN/`
 directories using frame counts from disk.
 
 This script:
-  1. Reads images.bin, deduplicates to one entry per camera (picks the image
-     with the most 2D point observations for best pose quality)
+  1. Reads images.bin, filters out poorly-registered cameras (cam01 has 0.04%
+     match rate — it's noise, not signal), deduplicates to one entry per
+     good camera (picks the image with the most 2D point observations)
   2. Rewrites images.bin with `imageN.jpg` naming and sequential camera IDs
   3. Rewrites cameras.bin with matching sequential camera IDs starting at 1
-  4. Converts points3D.bin → points3D_multipleview.ply (downsampled to <40k)
+  4. Converts dense fused.ply → points3D_multipleview.ply (downsampled to <50k)
+     Falls back to sparse points3D.bin if dense cloud unavailable
   5. Copies poses_bounds.npy → poses_bounds_multipleview.npy
   6. Creates the final directory layout
 
-Input:  scene/sparse/0/{cameras,images,points3D}.bin + scene/poses_bounds.npy
+Input:  scene/dense/fused.ply + scene/sparse/0/{cameras,images}.bin +
+        scene/poses_bounds.npy
 Output: data/multipleview/replay/ with the 4DGS-expected structure
 """
 
@@ -155,7 +158,7 @@ def write_ply(xyz, rgb, path):
             f.write(struct.pack("<3B", *rgb[i]))
 
 
-def downsample_points(xyz, rgb, max_points=40000):
+def downsample_points(xyz, rgb, max_points=50000):
     """Voxel downsample to at most max_points via increasing voxel size."""
     if len(xyz) <= max_points:
         return xyz, rgb
@@ -167,7 +170,7 @@ def downsample_points(xyz, rgb, max_points=40000):
         cur_xyz = cur_xyz[unique_idx]
         cur_rgb = cur_rgb[unique_idx]
         print(f"  Downsampled to {len(cur_xyz)} points (voxel_size={voxel_size:.3f})")
-        voxel_size += 0.01
+        voxel_size *= 1.5
     return cur_xyz, cur_rgb
 
 
@@ -181,8 +184,15 @@ def extract_cam_number(name):
     return None
 
 
+MIN_MATCH_RATE = 0.005  # 0.5% — cameras below this are unreliable
+
+
 def pick_best_per_camera(images):
-    """Select one image per camera — the one with the most matched 3D points."""
+    """Select one image per camera — the one with the most matched 3D points.
+    
+    Filters out cameras with fewer than MIN_MATCH_RATE of their 2D features
+    matched to 3D points, as those have unreliable poses.
+    """
     by_cam = collections.defaultdict(list)
     for image_id, img in images.items():
         cam_num = extract_cam_number(img["name"])
@@ -190,17 +200,69 @@ def pick_best_per_camera(images):
             print(f"  [WARN] Could not parse camera number from '{img['name']}', skipping")
             continue
         n_matched = sum(1 for p in img["point3D_ids"] if p >= 0)
-        by_cam[cam_num].append((n_matched, image_id, img))
+        n_total = len(img["point3D_ids"])
+        by_cam[cam_num].append((n_matched, n_total, image_id, img))
 
     best = {}
+    rejected = {}
     for cam_num, entries in sorted(by_cam.items()):
         entries.sort(reverse=True)
-        best_matched, best_id, best_img = entries[0]
+        best_matched, best_total, best_id, best_img = entries[0]
+        match_rate = best_matched / best_total if best_total > 0 else 0
+
+        if match_rate < MIN_MATCH_RATE:
+            rejected[cam_num] = (match_rate, len(entries))
+            print(f"  cam{cam_num:02d}: REJECTED — best match rate {match_rate:.4f} "
+                  f"({best_matched}/{best_total}), {len(entries)} frames registered. "
+                  f"Pose is unreliable.")
+            continue
+
         print(f"  cam{cam_num:02d}: picked image_id={best_id} "
               f"('{best_img['name']}', {best_matched} matched pts, "
-              f"{len(entries)} candidates)")
+              f"match rate {match_rate:.3f}, {len(entries)} candidates)")
         best[cam_num] = best_img
+
+    if rejected:
+        print(f"\n  Rejected {len(rejected)} camera(s) with unreliable poses: "
+              f"{['cam'+str(c).zfill(2) for c in rejected.keys()]}")
+    if len(best) < 2:
+        print("[FAIL] Need at least 2 cameras with reliable poses")
+        sys.exit(1)
+
     return best
+
+
+def read_dense_ply(path):
+    """Read a COLMAP fused.ply (binary little-endian, x/y/z/nx/ny/nz/r/g/b)."""
+    import struct as _struct
+    with open(path, "rb") as f:
+        n_vertices = None
+        while True:
+            line = f.readline().decode("ascii", errors="replace").strip()
+            if line.startswith("element vertex"):
+                n_vertices = int(line.split()[-1])
+            if line == "end_header":
+                break
+        if n_vertices is None:
+            print(f"[FAIL] Could not parse vertex count from {path}")
+            sys.exit(1)
+
+        vertex_size = 3 * 4 + 3 * 4 + 3 * 1  # 3 float xyz + 3 float normal + 3 uint8 rgb
+        data = f.read(n_vertices * vertex_size)
+
+    xyz = np.zeros((n_vertices, 3), dtype=np.float32)
+    rgb = np.zeros((n_vertices, 3), dtype=np.uint8)
+    for i in range(n_vertices):
+        offset = i * vertex_size
+        xyz[i] = _struct.unpack_from("<3f", data, offset)
+        rgb[i] = _struct.unpack_from("<3B", data, offset + 24)
+
+    mask = ~(np.isnan(xyz).any(axis=1) | np.isinf(xyz).any(axis=1))
+    if mask.sum() < len(xyz):
+        print(f"  Removed {len(xyz) - mask.sum()} NaN/Inf points")
+        xyz, rgb = xyz[mask], rgb[mask]
+
+    return xyz, rgb
 
 
 def restructure(scene_dir, output_dir, image_source_dir=None):
@@ -210,25 +272,26 @@ def restructure(scene_dir, output_dir, image_source_dir=None):
     sparse_in = scene_dir / "sparse" / "0"
     assert (sparse_in / "images.bin").exists(), f"Missing {sparse_in / 'images.bin'}"
     assert (sparse_in / "cameras.bin").exists(), f"Missing {sparse_in / 'cameras.bin'}"
-    assert (sparse_in / "points3D.bin").exists(), f"Missing {sparse_in / 'points3D.bin'}"
+
+    dense_ply = scene_dir / "dense" / "fused.ply"
+    sparse_pts = sparse_in / "points3D.bin"
 
     # ── Step 1: Read COLMAP output ───────────────────────────────────────
     print("\n[1/6] Reading COLMAP binary files...")
     images = read_images_binary(str(sparse_in / "images.bin"))
     cameras = read_cameras_binary(str(sparse_in / "cameras.bin"))
-    points = read_points3D_binary(str(sparse_in / "points3D.bin"))
-    print(f"  {len(images)} images, {len(cameras)} camera models, {len(points)} 3D points")
+    print(f"  {len(images)} registered images, {len(cameras)} camera models")
 
-    # ── Step 2: Pick one best image per camera ───────────────────────────
-    print("\n[2/6] Selecting best pose per camera...")
+    # ── Step 2: Pick one best image per camera (filters bad ones) ────────
+    print("\n[2/6] Selecting best pose per camera (filtering unreliable cameras)...")
     best = pick_best_per_camera(images)
     registered_cams = sorted(best.keys())
-    print(f"  Registered cameras: {['cam'+str(c).zfill(2) for c in registered_cams]}")
+    print(f"  Using cameras: {['cam'+str(c).zfill(2) for c in registered_cams]}")
 
     # ── Step 3: Rewrite images.bin with imageN.jpg naming ────────────────
     print("\n[3/6] Rewriting images.bin with 4DGS-compatible naming...")
     new_images = {}
-    old_cam_to_new = {}  # maps old camera_id → new sequential id
+    old_cam_to_new = {}
     for new_id, cam_num in enumerate(registered_cams, start=1):
         img = best[cam_num]
         old_cam_id = img["camera_id"]
@@ -253,11 +316,22 @@ def restructure(scene_dir, output_dir, image_source_dir=None):
         print(f"  camera_id {old_id} → {new_id} "
               f"({cam['width']}x{cam['height']}, focal={cam['params'][0]:.1f})")
 
-    # ── Step 5: Convert points3D to PLY ──────────────────────────────────
-    print(f"\n[5/6] Converting {len(points)} 3D points to PLY...")
-    xyz = np.array([p["xyz"] for p in points.values()])
-    rgb = np.array([p["rgb"] for p in points.values()], dtype=np.uint8)
-    xyz, rgb = downsample_points(xyz, rgb, max_points=40000)
+    # ── Step 5: Load point cloud (dense preferred, sparse fallback) ──────
+    if dense_ply.exists():
+        print(f"\n[5/6] Loading DENSE point cloud from {dense_ply}...")
+        xyz, rgb = read_dense_ply(str(dense_ply))
+        print(f"  Loaded {len(xyz)} dense points")
+        xyz, rgb = downsample_points(xyz, rgb, max_points=50000)
+    elif sparse_pts.exists():
+        print(f"\n[5/6] WARNING: Dense cloud not found, falling back to SPARSE "
+              f"points3D.bin (expect poor results)...")
+        points = read_points3D_binary(str(sparse_pts))
+        xyz = np.array([p["xyz"] for p in points.values()])
+        rgb = np.array([p["rgb"] for p in points.values()], dtype=np.uint8)
+        xyz, rgb = downsample_points(xyz, rgb, max_points=50000)
+    else:
+        print("[FAIL] No point cloud found (need dense/fused.ply or sparse/0/points3D.bin)")
+        sys.exit(1)
     print(f"  Final point count: {len(xyz)}")
 
     # ── Step 6: Write output ─────────────────────────────────────────────
@@ -284,9 +358,10 @@ def restructure(scene_dir, output_dir, image_source_dir=None):
     else:
         print(f"  [WARN] {poses_src} not found — video render path won't work")
 
-    # Symlink or copy camera frame directories
+    # Symlink camera frame directories (only for accepted cameras)
     img_src = image_source_dir or scene_dir / "images"
     img_src = Path(img_src)
+    first_cam = None
     for cam_num in registered_cams:
         cam_dir_name = f"cam{cam_num:02d}"
         src = img_src / cam_dir_name
@@ -300,8 +375,24 @@ def restructure(scene_dir, output_dir, image_source_dir=None):
             os.symlink(str(src.resolve()), str(dst))
             n_frames = len(list(src.glob("frame_*.jpg")))
             print(f"  Symlinked {dst} → {src} ({n_frames} frames)")
+            if first_cam is None:
+                first_cam = cam_dir_name
         else:
             print(f"  [WARN] Source frames not found at {src}")
+
+    # The 4DGS loader hardcodes cam01 for frame counting (line 32 of
+    # multipleview_dataset.py). Create a cam01 symlink pointing to the
+    # first real camera so it can count frames without crashing.
+    cam01_dst = output_dir / "cam01"
+    if first_cam and first_cam != "cam01":
+        first_cam_src = img_src / first_cam
+        if cam01_dst.exists() or cam01_dst.is_symlink():
+            if cam01_dst.is_symlink():
+                cam01_dst.unlink()
+            else:
+                shutil.rmtree(str(cam01_dst))
+        os.symlink(str(first_cam_src.resolve()), str(cam01_dst))
+        print(f"  Symlinked cam01 → {first_cam_src} (compatibility shim for 4DGS loader)")
 
     # ── Verification ─────────────────────────────────────────────────────
     print("\n" + "=" * 60)
@@ -326,8 +417,13 @@ def restructure(scene_dir, output_dir, image_source_dir=None):
             print(f"  [MISSING] cam{cam_num:02d}/")
             ok = False
 
+    cam01_exists = (output_dir / "cam01").exists()
+    print(f"  [{'OK' if cam01_exists else 'MISSING'}] cam01/ (loader compatibility)")
+
     if ok:
-        print("\n  ALL CHECKS PASSED — ready for 4DGS training")
+        print(f"\n  ALL CHECKS PASSED — ready for 4DGS training")
+        print(f"  Cameras: {len(registered_cams)} ({', '.join('cam'+str(c).zfill(2) for c in registered_cams)})")
+        print(f"  Point cloud: {len(xyz)} points ({'dense' if dense_ply.exists() else 'sparse'})")
         print(f"  Train with: -s {output_dir}")
     else:
         print("\n  SOME CHECKS FAILED — review warnings above")
