@@ -59,7 +59,7 @@ else
 fi
 
 cd $INSTANTSPLAT_DIR
-pip install -q -r requirements.txt --ignore-installed blinker
+grep -v "^blinker" requirements.txt | pip install -q -r /dev/stdin
 echo "  Building diff-gaussian-rasterization (CUDA, ~3 min)..."
 pip install -q submodules/diff-gaussian-rasterization
 echo "  Building simple-knn..."
