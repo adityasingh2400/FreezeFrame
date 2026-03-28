@@ -159,7 +159,7 @@ def extract_frames(
     - Resolution is preserved with letterbox padding (no stretching)
     """
     output_cam_dir.mkdir(parents=True, exist_ok=True)
-    output_pattern = str(output_cam_dir / "frame_%05d.png")
+    output_pattern = str(output_cam_dir / "frame_%05d.jpg")
 
     w, h = resolution
     # scale to fit within WxH preserving aspect ratio, then pad to exact WxH
@@ -175,7 +175,7 @@ def extract_frames(
         "-i", str(video_path),
         "-t", str(duration),
         "-vf", vf,
-        "-start_number", "0",     # frame_00000.png, not frame_00001.png
+        "-start_number", "1",     # frame_00001.jpg (1-indexed for 4DGS loader)
         "-q:v", "1",
         "-fps_mode", "cfr",
         output_pattern,
@@ -193,7 +193,7 @@ def extract_frames(
         print(result.stderr)
         sys.exit(1)
 
-    frames = sorted(output_cam_dir.glob("frame_*.png"))
+    frames = sorted(output_cam_dir.glob("frame_*.jpg"))
     print(f"[OK]   {video_path.name} -> {len(frames)} frames -> {output_cam_dir.name}/")
     return len(frames)
 
@@ -216,7 +216,7 @@ def check_frame_quality(cam_dirs: list[Path], blur_threshold: float = 50.0):
 
     print("[INFO] Checking frame quality (blur detection)...")
     for cam_dir in cam_dirs:
-        frames = sorted(cam_dir.glob("frame_*.png"))
+        frames = sorted(cam_dir.glob("frame_*.jpg"))
         if not frames:
             continue
         # Sample 3 frames: first, middle, last
@@ -238,13 +238,13 @@ def check_frame_quality(cam_dirs: list[Path], blur_threshold: float = 50.0):
 # ─────────────────────────────────────────────
 
 def equalize_frame_counts(cam_dirs: list[Path]) -> int:
-    counts = [len(list(d.glob("frame_*.png"))) for d in cam_dirs]
+    counts = [len(list(d.glob("frame_*.jpg"))) for d in cam_dirs]
     min_count = min(counts)
     print(f"[INFO] Frame counts per camera: {counts} -> equalizing to {min_count}")
 
     for d, count in zip(cam_dirs, counts):
         if count > min_count:
-            frames = sorted(d.glob("frame_*.png"))
+            frames = sorted(d.glob("frame_*.jpg"))
             for f in frames[min_count:]:
                 f.unlink()
 
@@ -351,7 +351,7 @@ def main():
 
         cam_dirs = []
         for i, (video, offset) in enumerate(zip(videos, offsets)):
-            cam_dir = images_dir / f"cam{i:02d}"
+            cam_dir = images_dir / f"cam{i+1:02d}"
             extract_frames(video, cam_dir, offset, duration, args.fps, resolution)
             cam_dirs.append(cam_dir)
 
