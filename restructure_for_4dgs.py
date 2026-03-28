@@ -134,7 +134,7 @@ def write_cameras_binary(cameras, path):
 # ── PLY writer ───────────────────────────────────────────────────────────────
 
 def write_ply(xyz, rgb, path):
-    """Write a simple PLY point cloud."""
+    """Write a PLY point cloud with normals (required by 4DGS fetchPly)."""
     n = len(xyz)
     header = (
         "ply\n"
@@ -143,6 +143,9 @@ def write_ply(xyz, rgb, path):
         "property float x\n"
         "property float y\n"
         "property float z\n"
+        "property float nx\n"
+        "property float ny\n"
+        "property float nz\n"
         "property uchar red\n"
         "property uchar green\n"
         "property uchar blue\n"
@@ -150,8 +153,10 @@ def write_ply(xyz, rgb, path):
     )
     with open(path, "wb") as f:
         f.write(header.encode("ascii"))
+        zeros = struct.pack("<3f", 0.0, 0.0, 0.0)
         for i in range(n):
             f.write(struct.pack("<3f", *xyz[i]))
+            f.write(zeros)
             f.write(struct.pack("<3B", *rgb[i]))
 
 

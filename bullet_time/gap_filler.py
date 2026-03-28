@@ -282,51 +282,164 @@ def fill_all_gaps(
     views_per_gap: int = 3,
     client=None,
 ) -> list[tuple[str, np.ndarray]]:
-    """Fill all gaps between cameras with synthetic views.
+    """Fill all gaps between cameras with fully concurrent generation.
 
-    Args:
-        real_frames: {cam_name: image} dict, ordered by camera position.
-        views_per_gap: Synthetic views per gap.
-        client: Gemini client.
-
-    Returns:
-        Ordered list of (label, image) for the full strip including real frames.
+    Round 1: ALL edge frames across ALL gaps fire concurrently (6 calls).
+    Round 2: ALL center frames across ALL gaps fire concurrently (3 calls).
+    Total: 2 sequential rounds instead of 6.
     """
     client = client or _get_client()
+    import time
 
     cam_names = sorted(real_frames.keys())
     all_real = [real_frames[c] for c in cam_names]
     all_labels = [f"Camera {i+1} ({c})" for i, c in enumerate(cam_names)]
-
-    strip = []
     num_gaps = len(cam_names) - 1
+    deg_per_step = 35.0 / (views_per_gap + 1)
 
-    # Round 1: Generate all edge synthetics in parallel across gaps
-    # Round 2: Generate all center synthetics in parallel across gaps
-    # (handled inside fill_gap with its own threading)
+    def _rotation_desc(gap_label, step_num):
+        deg = round(deg_per_step * step_num)
+        return (
+            f"Generate the view from a camera that has moved ~{deg} degrees to the "
+            f"RIGHT of the left camera ({gap_label}). Compared to the left camera image, "
+            f"the person should appear rotated ~{deg} degrees CLOCKWISE (you see slightly "
+            f"more of their right side). The background shifts ~{deg} degrees to the LEFT. "
+            f"The person's pose is FROZEN — identical arms, legs, expression. Only the "
+            f"viewing angle changes."
+        )
 
-    for i in range(len(cam_names)):
-        cam = cam_names[i]
-        strip.append((cam, real_frames[cam]))
+    # Build gap info
+    gaps = []
+    for i in range(num_gaps):
+        cam_l, cam_r = cam_names[i], cam_names[i + 1]
+        gaps.append({
+            "left": cam_l,
+            "right": cam_r,
+            "label": f"Camera {i+1} ({cam_l}) and Camera {i+2} ({cam_r})",
+        })
 
-        if i < num_gaps:
-            next_cam = cam_names[i + 1]
-            gap_label = f"Camera {i+1} ({cam}) and Camera {i+2} ({next_cam})"
-            print(f"\n  Filling gap: {gap_label} ({views_per_gap} synthetic views)")
+    # Storage for results: gap_synths[gap_idx] = [left, center, right] (for 3)
+    gap_synths = {i: [None] * views_per_gap for i in range(num_gaps)}
 
-            synth_frames = fill_gap(
-                real_left=real_frames[cam],
-                real_right=real_frames[next_cam],
-                all_real_frames=all_real,
-                all_real_labels=all_labels,
-                gap_label=gap_label,
-                num_synth=views_per_gap,
+    t0 = time.time()
+
+    if views_per_gap >= 3:
+        # ── Round 1: ALL edges concurrently ────────────────────────────
+        print(f"\n  Round 1: Generating {num_gaps * 2} edge frames concurrently...")
+
+        def _gen_edge(gap_idx, position):
+            """Generate one edge frame. position='left' or 'right'."""
+            gap = gaps[gap_idx]
+            step = 1 if position == "left" else views_per_gap
+            slot = 0 if position == "left" else views_per_gap - 1
+            result = generate_single_view(
+                reference_images=all_real,
+                cam_labels=all_labels,
+                target_description=_rotation_desc(gap["label"], step),
                 client=client,
             )
+            gap_synths[gap_idx][slot] = result
+            print(f"    [{gap['label']}] {position} edge done")
 
-            for j, sf in enumerate(synth_frames):
-                label = f"synth_{cam}_{next_cam}_{chr(97+j)}"
-                strip.append((label, sf))
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+            futures = []
+            for gi in range(num_gaps):
+                futures.append(pool.submit(_gen_edge, gi, "left"))
+                futures.append(pool.submit(_gen_edge, gi, "right"))
+            for f in as_completed(futures):
+                f.result()
+
+        print(f"  Round 1 done in {time.time() - t0:.1f}s")
+
+        # ── Round 2: ALL centers concurrently ──────────────────────────
+        t1 = time.time()
+        print(f"\n  Round 2: Generating {num_gaps} center frames concurrently...")
+
+        if views_per_gap == 3:
+            def _gen_center(gap_idx):
+                gap = gaps[gap_idx]
+                refs = all_real + [gap_synths[gap_idx][0], gap_synths[gap_idx][2]]
+                labels = all_labels + [
+                    f"Synthetic ~{round(deg_per_step)}° right ({gap['label']})",
+                    f"Synthetic ~{round(deg_per_step * views_per_gap)}° right ({gap['label']})",
+                ]
+                result = generate_single_view(
+                    reference_images=refs,
+                    cam_labels=labels,
+                    target_description=_rotation_desc(gap["label"], 2),
+                    client=client,
+                )
+                gap_synths[gap_idx][1] = result
+                print(f"    [{gap['label']}] center done")
+
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+                futures = [pool.submit(_gen_center, gi) for gi in range(num_gaps)]
+                for f in as_completed(futures):
+                    f.result()
+        else:
+            # For views_per_gap > 3, fill middle slots sequentially per gap but gaps in parallel
+            def _gen_middle(gap_idx):
+                gap = gaps[gap_idx]
+                refs = list(all_real) + [gap_synths[gap_idx][0], gap_synths[gap_idx][-1]]
+                labels = list(all_labels) + [
+                    f"Synthetic left edge ({gap['label']})",
+                    f"Synthetic right edge ({gap['label']})",
+                ]
+                for slot in range(1, views_per_gap - 1):
+                    step = slot + 1
+                    result = generate_single_view(
+                        reference_images=refs[:11],
+                        cam_labels=labels[:11],
+                        target_description=_rotation_desc(gap["label"], step),
+                        client=client,
+                    )
+                    gap_synths[gap_idx][slot] = result
+                    refs.append(result)
+                    labels.append(f"Synthetic ~{round(deg_per_step * step)}° ({gap['label']})")
+                print(f"    [{gap['label']}] middle frames done")
+
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+                futures = [pool.submit(_gen_middle, gi) for gi in range(num_gaps)]
+                for f in as_completed(futures):
+                    f.result()
+
+        print(f"  Round 2 done in {time.time() - t1:.1f}s")
+
+    else:
+        # views_per_gap <= 2: all frames in one concurrent round
+        print(f"\n  Generating {num_gaps * views_per_gap} frames concurrently...")
+
+        def _gen_simple(gap_idx, slot, step):
+            gap = gaps[gap_idx]
+            result = generate_single_view(
+                reference_images=all_real,
+                cam_labels=all_labels,
+                target_description=_rotation_desc(gap["label"], step),
+                client=client,
+            )
+            gap_synths[gap_idx][slot] = result
+            print(f"    [{gap['label']}] view {slot+1} done")
+
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+            futures = []
+            for gi in range(num_gaps):
+                for slot in range(views_per_gap):
+                    futures.append(pool.submit(_gen_simple, gi, slot, slot + 1))
+            for f in as_completed(futures):
+                f.result()
+
+    elapsed = time.time() - t0
+    total_synth = sum(len(v) for v in gap_synths.values())
+    print(f"\n  All {total_synth} synthetic frames done in {elapsed:.1f}s")
+
+    # ── Assemble strip ─────────────────────────────────────────────────
+    strip = []
+    for i, cam in enumerate(cam_names):
+        strip.append((cam, real_frames[cam]))
+        if i < num_gaps:
+            next_cam = cam_names[i + 1]
+            for j, sf in enumerate(gap_synths[i]):
+                strip.append((f"synth_{cam}_{next_cam}_{chr(97+j)}", sf))
 
     return strip
 

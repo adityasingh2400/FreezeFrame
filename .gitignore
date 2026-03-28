@@ -2,6 +2,9 @@
 scene/raw_videos/*.mp4
 scene/raw_videos/*.mov
 scene/raw_videos/*.MOV
+raw_videos/*.mp4
+raw_videos/*.mov
+raw_videos/*.MOV
 scene/synced_videos/*.mp4
 scene/images/cam*/*.png
 scene/images/cam*/*.jpg
