@@ -48,7 +48,9 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || fail "No GPU f
 echo ""
 
 log "Checking CUDA..."
-nvcc --version | grep "release" || fail "nvcc not found"
+nvcc --version 2>/dev/null | grep "release" || {
+    python3 -c "import torch; print(f'CUDA {torch.version.cuda} via PyTorch')" || fail "No CUDA found"
+}
 echo ""
 
 # ── 1. Clone repos ──────────────────────────────────────────────────
