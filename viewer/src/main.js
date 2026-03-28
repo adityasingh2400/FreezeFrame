@@ -68,9 +68,7 @@ async function init() {
   ui.hideLoading();
 
   const director = new DirectorMode(camera, cameraCtrl, player);
-  if (player.totalFrames > 1) {
-    director.loadDefault(player.totalFrames, player.fps);
-  }
+  director.loadDefault(Math.max(player.totalFrames, 1), player.fps || 30);
 
   // Director button
   const directorBtn = document.getElementById('director-btn');

@@ -43,14 +43,16 @@ export class DirectorMode {
   }
 
   loadDefault(totalFrames, fps) {
-    const duration = (totalFrames / fps) * 1000;
+    const duration = totalFrames > 1 ? (totalFrames / fps) * 1000 : 8000;
+    // Clean 180-degree orbit at constant height and radius
+    const r = 5;
+    const y = 1.5;
     this.setKeyframes([
-      { time: 0, position: [0, 1.5, 5], lookAt: [0, 0, 0], ease: 'easeOutQuad', speed: 0.5 },
-      { time: duration * 0.15, position: [3, 1, 3], lookAt: [0, 0.5, 0], ease: 'easeInOutCubic', speed: 0.5 },
-      { time: duration * 0.4, position: [4, 0.5, 0], lookAt: [0, 0.5, 0], ease: 'easeInOutCubic', speed: 0.25 },
-      { time: duration * 0.6, position: [3, 2, -2], lookAt: [0, 0.8, 0], ease: 'easeInOutCubic', speed: 0.5 },
-      { time: duration * 0.8, position: [0, 3, -3], lookAt: [0, 0.5, 0], ease: 'easeInOutCubic', speed: 1 },
-      { time: duration, position: [0, 1.5, 5], lookAt: [0, 0, 0], ease: 'easeOutQuad', speed: 1 },
+      { time: 0,              position: [0,    y,  r],    lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
+      { time: duration * 0.25, position: [r,    y,  0],    lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
+      { time: duration * 0.5,  position: [0,    y, -r],   lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
+      { time: duration * 0.75, position: [-r,   y,  0],   lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
+      { time: duration,        position: [0,    y,  r],    lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
     ]);
   }
 
