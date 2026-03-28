@@ -3,132 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Replay — 4D Sports Viewer</title>
+  <title>Freezeframe</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles.css" />
 </head>
 <body>
-  <canvas id="viewport"></canvas>
 
-  <div id="overlay">
-    <div id="header">
-      <div id="logo">REPLAY</div>
-      <div id="scene-name"></div>
-      <div id="header-right">
-        <div id="camera-presets">
-          <button class="preset-btn" data-preset="front">Front</button>
-          <button class="preset-btn" data-preset="side">Side</button>
-          <button class="preset-btn" data-preset="top">Top</button>
-        </div>
-        <button id="director-btn" aria-label="Toggle director mode (auto orbit)">
-          <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="10" cy="10" r="7"/>
-            <path d="M8 7l5 3-5 3V7z" fill="currentColor" stroke="none"/>
-          </svg>
-          Director
-        </button>
-      </div>
+  <!-- ── Landing ── -->
+  <div id="landing">
+    <div id="landing-inner">
+      <img id="landing-logo" src="/freezeframe-logo.svg" alt="" aria-hidden="true" />
+      <div id="landing-wordmark">FREEZEFRAME</div>
+      <label id="upload-zone" for="file-input">
+        <input type="file" id="file-input" accept="video/*" tabindex="-1" />
+        <span id="upload-label">Upload Video</span>
+      </label>
     </div>
+  </div>
 
-    <!-- Loading Screen -->
-    <div id="loading-screen" role="status" aria-live="polite">
-      <div id="loading-content">
-        <div id="loading-title">REPLAY</div>
-        <div id="loading-ring" aria-hidden="true"></div>
-        <div id="loading-pct">0%</div>
-        <div id="loading-bar-track" aria-hidden="true">
-          <div id="loading-bar-fill"></div>
-        </div>
-        <div id="loading-text">Initializing...</div>
-      </div>
-    </div>
-
-    <!-- Error Screen -->
-    <div id="error-screen" aria-live="assertive">
-      <div id="error-content">
-        <div id="error-icon" aria-hidden="true">⚠</div>
-        <div id="error-title">Failed to load scene</div>
-        <div id="error-message"></div>
-        <div id="error-hint">Check the browser console for details.</div>
-        <button id="error-reload-btn" onclick="window.location.reload()">Reload</button>
-      </div>
-    </div>
-
-    <!-- Orbit hint (splat mode) -->
-    <div id="orbit-hint" aria-label="Controls: drag to orbit, scroll to zoom">
-      <span><kbd>drag</kbd> Orbit</span>
-      <span><kbd>scroll</kbd> Zoom</span>
-      <span><kbd>shift+drag</kbd> Pan</span>
-      <span><kbd>D</kbd> Director</span>
-    </div>
-
-    <!-- Bullet-Time overlays -->
-    <div id="bt-moment-label" class="bt-only" style="display:none"></div>
-    <div id="bt-moment-desc" class="bt-only" style="display:none"></div>
-    <div id="bt-source-badge" class="bt-only" style="display:none"></div>
-    <div id="bt-drag-hint" class="bt-only" style="display:none">
-      <span><kbd>drag</kbd> Rotate</span>
-      <span><kbd>scroll</kbd> Step</span>
-      <span><kbd>&larr; &rarr;</kbd> Step</span>
-    </div>
-    <div id="bt-angle-indicator" class="bt-only" style="display:none">
-      <div id="bt-angle-fill"></div>
-    </div>
-
-    <!-- Controls Bar -->
-    <div id="controls-bar">
-      <div id="frame-block">
-        <div id="frame-counter" aria-label="Current frame">000</div>
-        <div id="frame-label">Frame</div>
-      </div>
-      <div id="playback-controls">
-        <button class="skip-btn" id="prev-btn" aria-label="Previous frame">
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M3 3h1.5v10H3V3zm9.5 0L5 8l7.5 5V3z"/></svg>
-        </button>
-        <button id="play-btn" aria-label="Play or pause (Space)">
-          <svg id="icon-play" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
-          <svg id="icon-pause" viewBox="0 0 24 24" width="18" height="18" style="display:none" aria-hidden="true"><rect x="5" y="3" width="4" height="18" fill="currentColor"/><rect x="15" y="3" width="4" height="18" fill="currentColor"/></svg>
-        </button>
-        <button class="skip-btn" id="next-btn" aria-label="Next frame">
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M11.5 3H13v10h-1.5V3zM3.5 3l7.5 5-7.5 5V3z"/></svg>
-        </button>
-      </div>
-      <div id="timeline-container">
-        <input type="range" id="timeline" min="0" max="1" step="1" value="0"
-          aria-label="Timeline scrubber" />
-      </div>
-      <div id="speed-control">
-        <button class="speed-btn" data-speed="0.25" aria-label="0.25x speed">0.25×</button>
-        <button class="speed-btn" data-speed="0.5" aria-label="0.5x speed">0.5×</button>
-        <button class="speed-btn active" data-speed="1" aria-label="1x speed">1×</button>
-        <button class="speed-btn" data-speed="2" aria-label="2x speed">2×</button>
-      </div>
-    </div>
-
-    <div id="stats" aria-live="off" aria-atomic="true">
-      <span id="fps-counter"></span>
-      <span id="splat-counter"></span>
-    </div>
-
-    <!-- Gemini Live Chat Panel -->
-    <div id="gemini-chat" class="bt-only" style="display:none">
-      <div id="gemini-chat-header">
-        <span id="gemini-status-dot" class="gemini-dot disconnected"></span>
-        <span id="gemini-status-label">Disconnected</span>
-      </div>
-      <div id="gemini-messages"></div>
-      <div id="gemini-input-row">
-        <input type="text" id="gemini-input" placeholder="Ask about any moment..." autocomplete="off" />
-        <button id="gemini-send" aria-label="Send">
-          <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor"><path d="M2 10l7-7v4h9v6h-9v4z" transform="rotate(-90 10 10)"/></svg>
-        </button>
+  <!-- ── Processing ── -->
+  <div id="processing">
+    <div id="processing-inner">
+      <div id="processing-wordmark">FREEZEFRAME</div>
+      <div id="processing-steps">
+        <div class="p-step" id="step-0">Analyzing footage</div>
+        <div class="p-step" id="step-1">Detecting moment</div>
+        <div class="p-step" id="step-2">Generating views</div>
+        <div class="p-step" id="step-3">Ready</div>
       </div>
     </div>
   </div>
 
+  <!-- ── Viewer ── -->
+  <canvas id="viewport"></canvas>
+  <div id="viewer-hud">
+    <div id="viewer-wordmark">FREEZEFRAME</div>
+    <div id="listening-indicator" data-state="idle">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
-  <script src="/gemini_live.js" defer></script>
 </body>
 </html>
