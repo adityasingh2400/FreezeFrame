@@ -93,15 +93,29 @@ def run_colmap_feature_extraction(image_list: list[Path], database_path: Path, i
 
 
 def run_colmap_matching(database_path: Path):
-    """Run COLMAP exhaustive matching.
+    """Run COLMAP exhaustive matching via the binary.
 
-    Exhaustive matching compares every image pair — correct for small sets (4-5 cameras).
+    Uses the colmap binary instead of pycolmap — pycolmap's match_exhaustive
+    crashes on large image sets when writing matches to the database.
+    Falls back to pycolmap only if the binary is not on PATH.
     """
-    print("  Running exhaustive feature matching...")
-    pycolmap.match_exhaustive(
-        database_path=database_path,
-        device=pycolmap.Device.auto,
-    )
+    colmap_bin = shutil.which("colmap")
+
+    if colmap_bin:
+        print("  Running exhaustive feature matching (colmap binary)...")
+        cmd = [
+            colmap_bin, "exhaustive_matcher",
+            "--database_path", str(database_path),
+            "--SiftMatching.use_gpu", "1",
+        ]
+        result = subprocess.run(cmd, capture_output=False)
+        if result.returncode != 0:
+            print(f"  WARNING: colmap binary matcher exited {result.returncode}, trying pycolmap fallback...")
+            pycolmap.match_exhaustive(database_path=database_path, device=pycolmap.Device.auto)
+    else:
+        print("  Running exhaustive feature matching (pycolmap fallback — binary not found)...")
+        pycolmap.match_exhaustive(database_path=database_path, device=pycolmap.Device.auto)
+
     print("  Matching done.")
 
 
