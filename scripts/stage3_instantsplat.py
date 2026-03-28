@@ -128,37 +128,52 @@ def run_instantsplat(
     iterations: int,
     dry_run: bool,
 ) -> bool:
-    """Run InstantSplat train.py for a single timestep.
+    """Run InstantSplat for a single timestep: init_geo.py then train.py.
 
     Returns True on success, False on failure.
     """
-    cmd = [
-        "python", "train.py",
+    # Step 1: MASt3R geometry initialization (generates camera poses + confidence maps)
+    init_cmd = [
+        "python", "-W", "ignore", "init_geo.py",
         "-s", str(source_dir),
         "-m", str(model_dir),
         "--n_views", str(n_views),
+        "--focal_avg",
+        "--co_vis_dsp",
+        "--conf_aware_ranking",
+        "--infer_video",
+    ]
+
+    # Step 2: Gaussian splatting training
+    train_cmd = [
+        "python", "train.py",
+        "-s", str(source_dir),
+        "-m", str(model_dir),
+        "-r", "1",
+        "--n_views", str(n_views),
         "--iterations", str(iterations),
-        "--quiet",
+        "--pp_optimizer",
+        "--optim_pose",
     ]
 
     if dry_run:
-        print(f"  DRY RUN: {' '.join(cmd)}")
+        print(f"  DRY RUN init:  {' '.join(init_cmd)}")
+        print(f"  DRY RUN train: {' '.join(train_cmd)}")
         return True
 
-    result = subprocess.run(
-        cmd,
-        cwd=str(instantsplat_dir),
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        print(f"  FAILED (exit {result.returncode})")
-        # Show last 10 lines of stderr for diagnosis
-        stderr_lines = result.stderr.strip().splitlines()
-        for line in stderr_lines[-10:]:
-            print(f"    {line}")
-        return False
+    for label, cmd in [("init_geo", init_cmd), ("train", train_cmd)]:
+        result = subprocess.run(
+            cmd,
+            cwd=str(instantsplat_dir),
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(f"  FAILED at {label} (exit {result.returncode})")
+            stderr_lines = (result.stderr + result.stdout).strip().splitlines()
+            for line in stderr_lines[-10:]:
+                print(f"    {line}")
+            return False
 
     return True
 
