@@ -17,7 +17,7 @@ from google.genai import types
 
 # ── Config ─────────────────────────────────────────────────────────────
 
-NANO_BANANA_PRO = "gemini-3.1-flash-image-preview"
+NANO_BANANA_PRO = "gemini-3-pro-image-preview"
 MAX_WORKERS = 6  # Concurrent API calls
 
 
@@ -78,18 +78,29 @@ def generate_single_view(
     )
 
     prompt = (
-        "You are generating a synthetic camera view for a bullet-time effect. "
-        "I'm providing reference images from multiple synchronized cameras "
-        "arranged in a semicircle around a basketball moment.\n\n"
+        "I have 4 real cameras arranged in a semicircle, evenly spaced ~35 degrees "
+        "apart, all pointed at the same person at the same frozen moment in time. "
+        "Camera 1 is the leftmost, Camera 4 is the rightmost.\n\n"
+        "As you go from Camera 1 to Camera 4 (left to right), the visual effect is:\n"
+        "- The person ROTATES clockwise (you see more of their right side)\n"
+        "- The background shifts to the LEFT\n"
+        "- The person stays in the CENTER of the frame, same size\n"
+        "- The person's POSE does NOT change — same arms, same legs, same expression\n"
+        "- Only the VIEWING ANGLE changes, nothing else\n\n"
         f"Reference images provided:\n{ref_description}\n\n"
-        f"TARGET: Generate a photorealistic image showing the view from "
-        f"{target_description}.\n\n"
-        "Requirements:\n"
-        "- Match the lighting, colors, and exposure of the reference cameras exactly\n"
-        "- Maintain correct perspective geometry for the target viewpoint\n"
-        "- The person's pose and all objects must be consistent with the reference views\n"
-        "- The result must look indistinguishable from a real camera at this position\n"
-        "- Output a single image at the same resolution as the references"
+        f"TARGET: {target_description}\n\n"
+        "CRITICAL RULES:\n"
+        "- The person's body must appear ROTATED compared to the neighboring cameras — "
+        "this is the MOST important thing. If Camera 1 shows the front of the person "
+        "and Camera 2 shows slightly more of their right side, a view between them "
+        "must show an intermediate rotation.\n"
+        "- Do NOT just copy one of the reference images. The whole point is that the "
+        "viewing angle is DIFFERENT from any reference camera.\n"
+        "- Keep the person's pose IDENTICAL — same arm position, same leg position. "
+        "Only the camera angle around them changes.\n"
+        "- Background elements shift LEFT as the camera moves RIGHT.\n"
+        "- Match lighting, colors, exposure, and zoom level of the reference cameras.\n"
+        "- Output a single image at the same resolution as the references."
     )
 
     contents = [prompt]
@@ -152,71 +163,69 @@ def fill_gap(
     """
     client = client or _get_client()
 
+    # Each gap is ~35 degrees. Compute per-step rotation.
+    deg_per_step = 35.0 / (num_synth + 1)
+
+    def _rotation_desc(step_num):
+        """Describe the visual rotation for step N within this gap."""
+        deg = round(deg_per_step * step_num)
+        return (
+            f"Generate the view from a camera that has moved ~{deg} degrees to the "
+            f"RIGHT of the left camera ({gap_label}). Compared to the left camera image, "
+            f"the person should appear rotated ~{deg} degrees CLOCKWISE (you see slightly "
+            f"more of their right side). The background shifts ~{deg} degrees to the LEFT. "
+            f"The person's pose is FROZEN — identical arms, legs, expression. Only the "
+            f"viewing angle changes. This view should look like a real photo taken from "
+            f"a camera placed between these two positions."
+        )
+
     if num_synth == 1:
-        # Simple case: one frame in the middle
         synth = generate_single_view(
             reference_images=all_real_frames,
             cam_labels=all_real_labels,
-            target_description=(
-                f"a virtual camera positioned exactly halfway between {gap_label}, "
-                f"at approximately 50% of the way along the arc"
-            ),
+            target_description=_rotation_desc(1),
             client=client,
         )
         return [synth]
 
     if num_synth == 2:
-        # Two frames: 33% and 67%
         results = [None, None]
-        positions = [("33%", "one-third"), ("67%", "two-thirds")]
 
-        def _gen(idx, pct, desc):
+        def _gen(idx, step):
             results[idx] = generate_single_view(
                 reference_images=all_real_frames,
                 cam_labels=all_real_labels,
-                target_description=(
-                    f"a virtual camera positioned at {pct} of the way "
-                    f"between {gap_label} ({desc} of the arc between them)"
-                ),
+                target_description=_rotation_desc(step),
                 client=client,
             )
 
         with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(_gen, i, p, d) for i, (p, d) in enumerate(positions)]
+            futures = [pool.submit(_gen, i, s) for i, s in enumerate([1, 2])]
             for f in as_completed(futures):
-                f.result()  # Raise if failed
+                f.result()
 
         return results
 
     # ── num_synth >= 3: Recursive edge-inward ──────────────────────────
 
-    # Round 1: Generate edge frames (parallel)
     synth_left = None
     synth_right = None
 
     def _gen_left():
         nonlocal synth_left
-        t_pct = round(100 / (num_synth + 1))
         synth_left = generate_single_view(
             reference_images=all_real_frames,
             cam_labels=all_real_labels,
-            target_description=(
-                f"a virtual camera at ~{t_pct}% of the way between {gap_label}, "
-                f"very close to the left camera but slightly rotated toward the right"
-            ),
+            target_description=_rotation_desc(1),
             client=client,
         )
 
     def _gen_right():
         nonlocal synth_right
-        t_pct = round(100 * num_synth / (num_synth + 1))
         synth_right = generate_single_view(
             reference_images=all_real_frames,
             cam_labels=all_real_labels,
-            target_description=(
-                f"a virtual camera at ~{t_pct}% of the way between {gap_label}, "
-                f"very close to the right camera but slightly rotated toward the left"
-            ),
+            target_description=_rotation_desc(num_synth),
             client=client,
         )
 
@@ -227,50 +236,40 @@ def fill_gap(
             f.result()
 
     if num_synth == 3:
-        # Round 2: Generate center frame with all context
         print(f"    Round 2: Generating center frame for {gap_label}...")
         refs = all_real_frames + [synth_left, synth_right]
         labels = all_real_labels + [
-            f"Synthetic left edge ({gap_label})",
-            f"Synthetic right edge ({gap_label})",
+            f"Synthetic ~{round(deg_per_step)}° right of left camera ({gap_label})",
+            f"Synthetic ~{round(deg_per_step * num_synth)}° right of left camera ({gap_label})",
         ]
         synth_center = generate_single_view(
             reference_images=refs,
             cam_labels=labels,
-            target_description=(
-                f"a virtual camera at exactly 50% between {gap_label}, "
-                f"the midpoint of the arc. I've also provided the two synthetic "
-                f"edge frames that bracket this position."
-            ),
+            target_description=_rotation_desc(2),
             client=client,
         )
         return [synth_left, synth_center, synth_right]
 
-    # For num_synth > 3: generate edges, then recursively fill the middle
+    # For num_synth > 3: generate edges, then fill middle steps sequentially
     middle_count = num_synth - 2
     refs = all_real_frames + [synth_left, synth_right]
     labels = all_real_labels + [
-        f"Synthetic left edge ({gap_label})",
-        f"Synthetic right edge ({gap_label})",
+        f"Synthetic ~{round(deg_per_step)}° right of left camera ({gap_label})",
+        f"Synthetic ~{round(deg_per_step * num_synth)}° right of left camera ({gap_label})",
     ]
 
     middle_frames = []
     for i in range(middle_count):
-        t = (i + 1) / (middle_count + 1)
-        t_pct = round(t * 100)
+        step = i + 2  # Steps 2, 3, ... (step 1 = synth_left, step num_synth = synth_right)
         frame = generate_single_view(
-            reference_images=refs[:14],
-            cam_labels=labels[:14],
-            target_description=(
-                f"a virtual camera at ~{t_pct}% of the way between the synthetic "
-                f"edge frames within {gap_label}"
-            ),
+            reference_images=refs[:11],
+            cam_labels=labels[:11],
+            target_description=_rotation_desc(step),
             client=client,
         )
         middle_frames.append(frame)
-        # Add to refs for subsequent frames
         refs.append(frame)
-        labels.append(f"Synthetic {t_pct}% ({gap_label})")
+        labels.append(f"Synthetic ~{round(deg_per_step * step)}° right ({gap_label})")
 
     return [synth_left] + middle_frames + [synth_right]
 
