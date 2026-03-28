@@ -53,12 +53,14 @@ def prepare_images(dataset_dir: Path, work_dir: Path):
         frames = sorted(cam_dir.glob("frame_*.jpg")) or sorted(cam_dir.glob("frame_*.png"))
         if not frames:
             continue
-        # Use middle frame — cameras are static, 1 frame per camera is enough for poses
-        mid = frames[len(frames) // 2]
-        dest = images_dir / f"{cam_dir.name}.jpg"
-        shutil.copy2(mid, dest)
-        count += 1
-        print(f"  Copied {cam_dir.name} -> {dest.name}")
+        # Use 5 evenly spaced frames per camera for better overlap detection
+        n = min(5, len(frames))
+        indices = [int(i * (len(frames) - 1) / (n - 1)) for i in range(n)] if n > 1 else [0]
+        for idx, fi in enumerate(indices):
+            dest = images_dir / f"{cam_dir.name}_f{idx:02d}.jpg"
+            shutil.copy2(frames[fi], dest)
+            count += 1
+        print(f"  Copied {cam_dir.name} -> {n} frames")
 
     print(f"  {count} camera images ready")
     return images_dir
@@ -108,11 +110,12 @@ def run_mapper(db: Path, images_dir: Path, work_dir: Path) -> Path:
         "--database_path", str(db),
         "--image_path", str(images_dir),
         "--output_path", str(sparse_out),
-        "--Mapper.min_num_matches", "8",
-        "--Mapper.init_min_num_inliers", "8",
-        "--Mapper.init_min_tri_angle", "2",
-        "--Mapper.abs_pose_min_num_inliers", "8",
-        "--Mapper.abs_pose_min_inlier_ratio", "0.05",
+        "--Mapper.min_num_matches", "5",
+        "--Mapper.init_min_num_inliers", "5",
+        "--Mapper.init_min_tri_angle", "1",
+        "--Mapper.abs_pose_min_num_inliers", "5",
+        "--Mapper.abs_pose_min_inlier_ratio", "0.02",
+        "--Mapper.max_reg_trials", "5",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
