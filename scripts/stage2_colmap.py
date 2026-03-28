@@ -115,7 +115,7 @@ def run_colmap_feature_extraction(image_list: list[Path], database_path: Path, i
         "--image_path", str(image_root),
         "--image_list_path", str(image_list_file),
         "--ImageReader.single_camera_per_folder", "1",
-        "--SiftExtraction.use_gpu", "1",
+        "--SiftExtraction.use_gpu", "0",
     ]
     result = subprocess.run(cmd)
     if result.returncode != 0:
@@ -131,7 +131,7 @@ def run_colmap_matching(database_path: Path):
     cmd = [
         colmap_bin, "exhaustive_matcher",
         "--database_path", str(database_path),
-        "--SiftMatching.use_gpu", "1",
+        "--SiftMatching.use_gpu", "0",
     ]
     result = subprocess.run(cmd)
     if result.returncode != 0:
