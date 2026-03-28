@@ -88,7 +88,6 @@ async function init() {
   // Dismiss orbit hint on first interaction
   canvas.addEventListener('pointerdown', () => {
     cameraCtrl.onUserInteract();
-    ui.dismissOrbitHint();
   }, { once: true });
 
   // Keyboard shortcuts
@@ -122,7 +121,6 @@ async function init() {
         e.preventDefault();
         director.toggle();
         ui.setDirectorActive(director.active);
-        ui.dismissOrbitHint();
         break;
     }
   });

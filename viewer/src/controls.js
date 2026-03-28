@@ -14,7 +14,6 @@ const PRESETS = {
     position: new THREE.Vector3(0, 6, 0.01),
     target: new THREE.Vector3(0, 0, 0),
   },
-  free: null,
 };
 
 export class CameraController {
@@ -36,7 +35,7 @@ export class CameraController {
     this._toPos = new THREE.Vector3();
     this._fromTarget = new THREE.Vector3();
     this._toTarget = new THREE.Vector3();
-    this._activePreset = 'free';
+    this._activePreset = null;
     this._presetBtns = document.querySelectorAll('.preset-btn');
 
     this._bindPresetButtons();
@@ -83,11 +82,7 @@ export class CameraController {
   }
 
   onUserInteract() {
-    if (this._activePreset !== 'free') {
-      this._activePreset = 'free';
-      this._presetBtns.forEach(b => {
-        b.classList.toggle('active', b.dataset.preset === 'free');
-      });
-    }
+    this._activePreset = null;
+    this._presetBtns.forEach(b => b.classList.remove('active'));
   }
 }

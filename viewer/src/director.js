@@ -44,15 +44,15 @@ export class DirectorMode {
 
   loadDefault(totalFrames, fps) {
     const duration = totalFrames > 1 ? (totalFrames / fps) * 1000 : 8000;
-    // Clean 180-degree orbit at constant height and radius
+    // Smooth 360-degree orbit at constant height, radius, and speed
     const r = 5;
     const y = 1.5;
     this.setKeyframes([
-      { time: 0,              position: [0,    y,  r],    lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
-      { time: duration * 0.25, position: [r,    y,  0],    lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
-      { time: duration * 0.5,  position: [0,    y, -r],   lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
-      { time: duration * 0.75, position: [-r,   y,  0],   lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
-      { time: duration,        position: [0,    y,  r],    lookAt: [0, 0, 0], ease: 'easeInOutCubic', speed: 1 },
+      { time: 0,               position: [ 0,  y,  r], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+      { time: duration * 0.25, position: [ r,  y,  0], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+      { time: duration * 0.5,  position: [ 0,  y, -r], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+      { time: duration * 0.75, position: [-r,  y,  0], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+      { time: duration,        position: [ 0,  y,  r], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
     ]);
   }
 

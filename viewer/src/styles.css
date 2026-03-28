@@ -389,22 +389,8 @@ canvas#viewport {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  opacity: 0;
-  animation: hint-appear 0.4s ease 1.5s forwards, hint-fade 0.4s ease 5.5s forwards;
+  opacity: 1;
   pointer-events: none;
-}
-
-@keyframes hint-appear {
-  to { opacity: 1; }
-}
-
-@keyframes hint-fade {
-  to { opacity: 0; }
-}
-
-#orbit-hint.dismissed {
-  opacity: 0 !important;
-  animation: none;
 }
 
 #orbit-hint span {
