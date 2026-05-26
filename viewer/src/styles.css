@@ -1495,6 +1495,7 @@ canvas#viewport.visible {
 .thumb.main-video {
   animation: none !important;
   transition: all 0.9s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transform: translate(-50%, -50%) !important;
   width: min(85vw, 1200px) !important;
   height: min(52vw, 700px) !important;
   margin-left: 0 !important;

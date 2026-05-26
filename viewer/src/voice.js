@@ -116,7 +116,24 @@ function setIndicator(state) {
 
 export function isMicActive() { return micActive; }
 export function reportFrameChange(f, t) { viewerFrame = f; viewerTotal = t; }
-export function setCurrentScene(l) { currentSceneLabel = l || ''; }
+export function setCurrentScene(l) {
+  currentSceneLabel = l || '';
+  // Tell the agent what scene we're now viewing
+  if (ws && ws.readyState === WebSocket.OPEN && l) {
+    const sceneInfo = SCENES.find(s => s.label === l);
+    const desc = sceneInfo ? sceneInfo.desc : '';
+    ws.send(JSON.stringify({
+      type: 'contextual_update',
+      text: `USER IS NOW VIEWING FREEZEFRAME: "${l}". ${desc}. 21 angles: 5 real cameras + 16 AI-generated views.`,
+    }));
+  }
+  if (ws && ws.readyState === WebSocket.OPEN && !l) {
+    ws.send(JSON.stringify({
+      type: 'contextual_update',
+      text: `USER IS NOW BACK TO WATCHING LIVE VIDEO FEEDS. Not in a freezeframe.`,
+    }));
+  }
+}
 
 export function setMicActive(active) {
   micActive = active;
@@ -238,6 +255,12 @@ export function disconnectVoice() {
   sessionReady = false;
 }
 
+export function resetAgent() {
+  micActive = false;
+  if (audioPlayer) audioPlayer.reset();
+  setIndicator('idle');
+}
+
 // ── Tool execution ────────────────────────────────────────────────────
 
 function handleTool(call) {
@@ -249,17 +272,17 @@ function handleTool(call) {
     case 'navigate_to_moment': {
       const scene = matchScene(parameters?.event_name || '');
       if (scene) {
-        result = `Navigating to "${scene.label}". ${scene.desc}`;
+        result = `NOW SHOWING: "${scene.label}". ${scene.desc}`;
         if (onNavigate) onNavigate(scene.slug, scene.label);
       } else {
-        result = 'No scenes available.';
+        result = 'No matching scene found. Available: The Keanu Dodge, The Kobe Fadeaway, The Roundhouse Kick, The Water Throw.';
       }
       break;
     }
 
     case 'freeze_last_moment': {
       const scene = nextScene();
-      result = `Freezing "${scene.label}". ${scene.desc}`;
+      result = `FREEZING NOW: "${scene.label}". ${scene.desc}`;
       if (onNavigate) onNavigate(scene.slug, scene.label);
       break;
     }
@@ -280,14 +303,34 @@ function handleTool(call) {
       break;
     }
 
+    case 'change_view': {
+      const dir = (parameters?.direction || '').toLowerCase();
+      const player = window.freezeframePlayer;
+      if (!player) { result = 'Not in a freezeframe.'; break; }
+      const last = player.totalFrames - 1;
+      if (dir.includes('right')) {
+        player.setFrame(last);
+        result = `Showing rightmost angle — frame ${last + 1}.`;
+      } else if (dir.includes('left')) {
+        player.setFrame(0);
+        result = `Showing leftmost angle — frame 1.`;
+      } else if (dir.includes('center') || dir.includes('middle')) {
+        player.setFrame(Math.floor(last / 2));
+        result = `Showing center angle — frame ${Math.floor(last / 2) + 1}.`;
+      } else {
+        result = `Unknown direction "${dir}". Use left, right, or center.`;
+      }
+      break;
+    }
+
     case 'describe_moment':
     case 'explain_moment': {
-      if (window.freezeframePlayer) {
+      if (window.freezeframePlayer && currentSceneLabel) {
         const sceneInfo = SCENES.find(s => s.label === currentSceneLabel);
         const desc = sceneInfo ? sceneInfo.desc : '';
-        result = `Viewing "${currentSceneLabel}", frame ${viewerFrame+1} of ${viewerTotal}. ${desc} This is frozen bullet-time — 5 real cameras plus 16 AI-generated angles.`;
+        result = `THE SCENE ON SCREEN RIGHT NOW IS: "${currentSceneLabel}". ${desc} Frame ${viewerFrame+1} of ${viewerTotal}. 5 real cameras + 16 AI-generated angles. DO NOT name any other scene — this is what the user sees.`;
       } else {
-        result = `Watching live video feeds. Available scenes: ${SCENES.map(s => `"${s.label}"`).join(', ')}.`;
+        result = `User is watching live video feeds, NOT in a freezeframe. Suggest they say "show me the keanu dodge" or name another scene to enter bullet-time.`;
       }
       break;
     }

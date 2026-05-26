@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ImageStripPlayer } from './image-strip-player.js';
-import { connectVoice, setMicActive, isMicActive, reportFrameChange, setCurrentScene } from './voice.js';
+import { connectVoice, setMicActive, isMicActive, reportFrameChange, setCurrentScene, resetAgent } from './voice.js';
 
 // ── DOM refs ──────────────────────────────────────────────────────────
 
@@ -340,17 +340,18 @@ function showAgentView() {
     label.style.opacity = '0';
 
     videoEls.push(video);
-    setTimeout(() => thumb.classList.add('visible'), 200 + i * 120);
+    video.play().catch(() => {});
+    setTimeout(() => thumb.classList.add('visible'), 100 + i * 80);
   }
 
   // Clap frames per camera: cam01=F0, cam02=F0, cam03=F0, cam04=F3, cam05=F8
   const clapFrames = [0, 0, 0, 3, 8];
 
   setTimeout(async () => {
-    await playSyncAnimation(5, clapFrames);
     startAllVideosSynced();
+    await playSyncAnimation(5, clapFrames);
     await highlightAndEnlarge();
-  }, 1200);
+  }, 500);
 
   connectVoice({
     onNavigate: handleMomentSelected,
@@ -365,7 +366,12 @@ function showAgentView() {
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
-        setMicActive(!micActive);
+        setMicActive(!isMicActive());
+      }
+      if (e.code === 'KeyJ' && !e.repeat) {
+        e.preventDefault();
+        resetAgent();
+        resumeAllVideos();
       }
     });
   }
@@ -559,8 +565,10 @@ async function playSyncAnimation(count, clapFrames) {
   const thumbs = Array.from({ length: count }, (_, i) => document.getElementById(`thumb-${i}`));
   const orbitContainer = document.getElementById('orbit-container');
 
+  // ── Phase 0: Show videos on orbit ring briefly ──
+  await sleep(1500);
+
   // ── Phase 1: Rearrange into vertical stack ──
-  // Hide agent circle and orbit ring during sync
   agentCircle.style.transition = 'opacity 0.5s ease';
   agentCircle.style.opacity = '0';
   const orbitRing = document.getElementById('orbit-ring');
@@ -585,6 +593,13 @@ async function playSyncAnimation(count, clapFrames) {
     thumb.style.marginLeft = '0px';
     thumb.style.marginTop = `${stackStartY + i * (stackHeight + stackGap)}px`;
     thumb.style.borderRadius = '8px';
+
+    // Seek each video to its clap frame so they visually align in the stack
+    const video = thumb.querySelector('.thumb-video');
+    if (video && isFinite(clapFrames[i])) {
+      video.pause();
+      video.currentTime = clapFrames[i] / 30;
+    }
   });
 
   await sleep(900);
@@ -778,23 +793,9 @@ async function playSyncAnimation(count, clapFrames) {
 
   await sleep(800);
 
-  // ── Phase 7: Agent circle appears at bottom-right of centered video ──
-  // Position agent circle relative to the hero video
-  // Hero is centered at orbit-container center (450, 450)
-  // Agent circle needs to be at bottom-right of the hero
-  const agentOffsetX = heroWidth / 2 + 20;
-  const agentOffsetY = heroHeight / 2 + 20;
-
-  agentCircle.style.transition = 'all 0.7s cubic-bezier(0.16, 1, 0.3, 1)';
-  agentCircle.style.width = '56px';
-  agentCircle.style.height = '56px';
-  agentCircle.style.marginLeft = `${agentOffsetX}px`;
-  agentCircle.style.marginTop = `${agentOffsetY}px`;
+  // ── Phase 7: Agent circle appears at bottom-right via corner-mode ──
+  agentCircle.classList.add('corner-mode');
   agentCircle.style.opacity = '1';
-
-  // Scale down the bars inside the circle
-  const agentBars = agentCircle.querySelector('#agent-bars');
-  if (agentBars) agentBars.style.transform = 'scale(0.5)';
 
   await sleep(800);
 
@@ -1050,14 +1051,14 @@ function returnToAgent() {
     thumb.querySelectorAll('.thumb-timeline, .clap-frame-container, .clap-connector, .thumb-waveform-scan, .thumb-waveform-bars, .sync-cam-badge').forEach(el => el.remove());
 
     if (i === 0) {
-      // Restore hero (thumb-0) centered
-      thumb.style.marginTop = '0px';
-      thumb.style.marginLeft = '0px';
-      thumb.style.width = '480px';
-      thumb.style.height = '288px';
-      thumb.style.borderRadius = '12px';
+      // Restore hero (thumb-0) centered — let main-video CSS handle sizing
+      thumb.style.marginTop = '';
+      thumb.style.marginLeft = '';
+      thumb.style.width = '';
+      thumb.style.height = '';
+      thumb.style.borderRadius = '';
       thumb.style.borderColor = '';
-      thumb.style.overflow = 'hidden';
+      thumb.style.overflow = '';
       thumb.style.opacity = '';
       thumb.style.transform = '';
       thumb.classList.add('visible', 'main-video');
@@ -1070,8 +1071,8 @@ function returnToAgent() {
       // Keep others hidden
       thumb.style.opacity = '0';
       thumb.style.transform = 'translate(-50%, -50%) scale(0.5)';
-      thumb.style.marginTop = '0px';
-      thumb.style.marginLeft = '0px';
+      thumb.style.marginTop = '';
+      thumb.style.marginLeft = '';
       thumb.style.width = '';
       thumb.style.height = '';
       thumb.style.borderRadius = '';
@@ -1081,17 +1082,17 @@ function returnToAgent() {
     }
   }
 
-  // Restore agent circle to corner position
+  // Restore agent circle to fixed corner position
   agentCircle.classList.remove('merging');
   agentCircle.classList.add('corner-mode');
   agentCircle.style.opacity = '1';
-  agentCircle.style.width = '56px';
-  agentCircle.style.height = '56px';
-  agentCircle.style.marginLeft = `${480 / 2 + 20}px`;
-  agentCircle.style.marginTop = `${288 / 2 + 20}px`;
+  agentCircle.style.width = '';
+  agentCircle.style.height = '';
+  agentCircle.style.marginLeft = '';
+  agentCircle.style.marginTop = '';
   agentCircle.style.transition = '';
   const agentBars = agentCircle.querySelector('#agent-bars');
-  if (agentBars) agentBars.style.transform = 'scale(0.5)';
+  if (agentBars) agentBars.style.transform = '';
 
   const orbitRing = document.getElementById('orbit-ring');
   if (orbitRing) orbitRing.style.opacity = '0';
@@ -1100,9 +1101,11 @@ function returnToAgent() {
   const oldSyncLabel = document.getElementById('sync-label');
   if (oldSyncLabel) oldSyncLabel.remove();
 
-  // Resume video playback
+  // Resume video playback from where it left off (don't restart)
   videosPaused = false;
-  startAllVideosSynced();
+  for (const video of videoEls) {
+    video.play().catch(() => {});
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
