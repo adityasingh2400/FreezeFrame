@@ -1,0 +1,17 @@
+{
+  "fps": 30,
+  "num_cameras": 5,
+  "num_frames": 1329,
+  "resolution": [
+    1920,
+    1080
+  ],
+  "sync_event_frame": 0,
+  "sync_offsets_seconds": [
+    0.8861904761904762,
+    2.0711337868480726,
+    0.0,
+    0.7096825396825397,
+    0.0
+  ]
+}

@@ -271,3 +271,16 @@ Hour 5-6      Load trained model into viewer
 - **Sync is off:** If audio sync doesn't work, manually align videos in any video editor to the clap frame and export. Ugly but fast.
 - **Cloud box dies:** Have COLMAP installed locally as backup. 4DGS can train on any CUDA GPU, even a laptop 3060, just slower.
 - **Training takes too long:** Reduce resolution to 640x360. Reduce iterations to minimum. You need output, not quality. Quality is tomorrow.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | SELECTIVE mode, 5 proposals, 2 accepted (Mia→viewer owner, early COLMAP validation), 0 critical gaps |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 2 issues (demo offline fallback resolved, config DRY→utils.py), 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL) | score: 3/10 → 9/10, 4 decisions made |
+
+- **OUTSIDE VOICE:** Claude subagent found 10 issues in CEO review. Most critical: Mia needs a deliverable (fixed), COLMAP needs early validation (fixed), .ply export is real engineering (acknowledged).
+- **UNRESOLVED:** 0
+- **VERDICT:** CEO + ENG + DESIGN CLEARED — ready to implement.

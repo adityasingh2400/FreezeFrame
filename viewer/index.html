@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freezeframe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+
+  <!-- ── Landing ── -->
+  <div id="landing">
+    <div id="landing-inner">
+      <img id="landing-logo" src="/freezeframe-logo.svg" alt="" aria-hidden="true" />
+      <div id="landing-wordmark">FREEZEFRAME</div>
+      <label id="upload-zone" for="file-input">
+        <input type="file" id="file-input" accept="video/*" multiple tabindex="-1" />
+        <span id="upload-label">Upload Videos</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ── Clap Flash Overlay ── -->
+  <div id="clap-flash"></div>
+  <div id="clap-ring"></div>
+
+  <!-- ── COLMAP Processing Screen ── -->
+  <div id="colmap-screen">
+    <div id="colmap-wordmark">FREEZEFRAME</div>
+    <canvas id="colmap-canvas"></canvas>
+    <div id="colmap-videos"></div>
+    <div id="colmap-status">
+      <div id="colmap-step" class="colmap-step-text"></div>
+      <div id="colmap-progress-bar"><div id="colmap-progress-fill"></div></div>
+      <div id="colmap-detail" class="colmap-detail-text"></div>
+    </div>
+  </div>
+
+  <!-- ── Agent View ── -->
+  <div id="agent-view">
+    <div id="agent-wordmark">FREEZEFRAME</div>
+    <div id="orbit-container">
+      <div id="agent-circle">
+        <div id="agent-bars">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div>
+        </div>
+      </div>
+      <div id="orbit-ring"></div>
+      <div class="thumb" id="thumb-0"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-1"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-2"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-3"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+      <div class="thumb" id="thumb-4"><video class="thumb-video" muted playsinline loop></video><span class="thumb-label"></span></div>
+    </div>
+    <div id="agent-hint">speak to explore moments</div>
+  </div>
+
+  <!-- ── Viewer ── -->
+  <canvas id="viewport"></canvas>
+  <div id="viewer-hud">
+    <div id="viewer-wordmark">FREEZEFRAME</div>
+    <button id="back-btn">&larr; BACK</button>
+    <div id="bt-moment-label"></div>
+    <div id="bt-moment-desc"></div>
+    <div id="bt-hud-bottom">
+      <div id="bt-frame-counter">
+        <span id="frame-counter">001</span>
+        <span id="frame-label">/ 021</span>
+      </div>
+      <div id="bt-source-badge" class="source-real">Real Camera</div>
+      <div id="bt-angle-bar"><div id="bt-angle-fill"></div></div>
+      <button id="bt-boomerang-btn">&#x27F3; Boomerang</button>
+    </div>
+    <div id="bt-drag-hint">drag to rotate</div>
+    <div id="viewer-overlay-text" data-mode="output"></div>
+    <div id="listening-indicator" data-state="idle">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

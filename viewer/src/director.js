@@ -1,0 +1,118 @@
+import * as THREE from 'three';
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeOutQuad(t) {
+  return 1 - (1 - t) * (1 - t);
+}
+
+const EASE_FNS = { easeInOutCubic, easeOutQuad, linear: t => t };
+
+export class DirectorMode {
+  constructor(camera, controls, player) {
+    this._camera = camera;
+    this._controls = controls;
+    this._player = player;
+    this._active = false;
+    this._keyframes = [];
+    this._startTime = 0;
+    this._totalDuration = 0;
+    this._btn = null;
+
+    this._tmpPos = new THREE.Vector3();
+    this._tmpTarget = new THREE.Vector3();
+
+    this._createToggleButton();
+  }
+
+  get active() { return this._active; }
+
+  setKeyframes(keyframes) {
+    this._keyframes = keyframes.map(kf => ({
+      time: kf.time,
+      position: new THREE.Vector3(...kf.position),
+      lookAt: new THREE.Vector3(...kf.lookAt),
+      ease: EASE_FNS[kf.ease] || easeInOutCubic,
+      speed: kf.speed ?? 1,
+    }));
+    if (this._keyframes.length > 0) {
+      this._totalDuration = this._keyframes[this._keyframes.length - 1].time;
+    }
+  }
+
+  loadDefault(totalFrames, fps) {
+    const duration = totalFrames > 1 ? (totalFrames / fps) * 1000 : 8000;
+    // Smooth 360-degree orbit at constant height, radius, and speed
+    const r = 5;
+    const y = 1.5;
+    this.setKeyframes([
+      { time: 0,               position: [ 0,  y,  r], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+      { time: duration * 0.25, position: [ r,  y,  0], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+      { time: duration * 0.5,  position: [ 0,  y, -r], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+      { time: duration * 0.75, position: [-r,  y,  0], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+      { time: duration,        position: [ 0,  y,  r], lookAt: [0, 0, 0], ease: 'linear', speed: 1 },
+    ]);
+  }
+
+  start() {
+    if (this._keyframes.length < 2) return;
+    this._active = true;
+    this._startTime = performance.now();
+    this._controls.controls.enabled = false;
+    this._player.play();
+    if (this._btn) this._btn.classList.add('active');
+  }
+
+  stop() {
+    this._active = false;
+    this._controls.controls.enabled = true;
+    this._player.pause();
+    if (this._btn) this._btn.classList.remove('active');
+  }
+
+  toggle() {
+    if (this._active) this.stop();
+    else this.start();
+  }
+
+  update(timestamp) {
+    if (!this._active || this._keyframes.length < 2) return;
+
+    const elapsed = timestamp - this._startTime;
+    if (elapsed >= this._totalDuration) {
+      this.stop();
+      return;
+    }
+
+    let kfA = this._keyframes[0];
+    let kfB = this._keyframes[1];
+    for (let i = 0; i < this._keyframes.length - 1; i++) {
+      if (elapsed >= this._keyframes[i].time && elapsed < this._keyframes[i + 1].time) {
+        kfA = this._keyframes[i];
+        kfB = this._keyframes[i + 1];
+        break;
+      }
+    }
+
+    const segDuration = kfB.time - kfA.time;
+    const segElapsed = elapsed - kfA.time;
+    const rawT = Math.min(segElapsed / segDuration, 1);
+    const t = kfB.ease(rawT);
+
+    this._tmpPos.lerpVectors(kfA.position, kfB.position, t);
+    this._tmpTarget.lerpVectors(kfA.lookAt, kfB.lookAt, t);
+
+    this._camera.position.copy(this._tmpPos);
+    this._controls.controls.target.copy(this._tmpTarget);
+
+    const speed = THREE.MathUtils.lerp(kfA.speed, kfB.speed, t);
+    this._player.setSpeed(speed);
+  }
+
+  _createToggleButton() {
+    // Use the button already in the HTML header — do not create a duplicate
+    this._btn = document.getElementById('director-btn');
+  }
+}

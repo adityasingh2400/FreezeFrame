@@ -1,0 +1,69 @@
+{
+  "scene_description": "A person is performing bottle flip tricks while several friends record the action with their phones in an outdoor setting on a sunny day.",
+  "moments": [
+    {
+      "timestamp_sec": 1.3,
+      "frame_number": 39,
+      "label": "Initial wind-up",
+      "description": "The person crouches slightly, holding the bottle, preparing for the first throw.",
+      "action_type": "wind-up",
+      "confidence": 0.8
+    },
+    {
+      "timestamp_sec": 1.7,
+      "frame_number": 51,
+      "label": "First bottle release",
+      "description": "The bottle is mid-air, having just been released from the person's hands during the first flip attempt.",
+      "action_type": "release",
+      "confidence": 0.9
+    },
+    {
+      "timestamp_sec": 4.5,
+      "frame_number": 135,
+      "label": "First successful flip celebration",
+      "description": "The person leans back with arms outstretched, celebrating the successful first bottle flip.",
+      "action_type": "celebration",
+      "confidence": 0.95
+    },
+    {
+      "timestamp_sec": 14.8,
+      "frame_number": 444,
+      "label": "Pre-jump crouch",
+      "description": "The person is in a low crouch, holding the bottle with both hands, before initiating the jump-throw.",
+      "action_type": "wind-up",
+      "confidence": 0.85
+    },
+    {
+      "timestamp_sec": 15.3,
+      "frame_number": 459,
+      "label": "Mid-air jump release",
+      "description": "The person is at the peak of their jump, releasing the bottle upwards during the second flip attempt.",
+      "action_type": "release",
+      "confidence": 0.95
+    },
+    {
+      "timestamp_sec": 35.5,
+      "frame_number": 1065,
+      "label": "Third throw wind-up",
+      "description": "The person is holding the bottle horizontally with both hands, preparing for the final throw.",
+      "action_type": "wind-up",
+      "confidence": 0.8
+    },
+    {
+      "timestamp_sec": 38.6,
+      "frame_number": 1158,
+      "label": "Water release mid-air",
+      "description": "Water visibly streams from the bottle as it is flung through the air during the final, unsuccessful attempt.",
+      "action_type": "release",
+      "confidence": 0.95
+    },
+    {
+      "timestamp_sec": 39.9,
+      "frame_number": 1197,
+      "label": "Bottle spill reaction",
+      "description": "The person looks down at the spilled water on the ground with a look of dismay after the flip.",
+      "action_type": "follow-through",
+      "confidence": 0.85
+    }
+  ]
+}

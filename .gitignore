@@ -1,0 +1,73 @@
+# Data files (too large for git)
+scene/raw_videos/*.mp4
+scene/raw_videos/*.mov
+scene/raw_videos/*.MOV
+raw_videos/*.mp4
+raw_videos/*.mov
+raw_videos/*.MOV
+scene/synced_videos/*.mp4
+scene/images/cam*/*.png
+scene/images/cam*/*.jpg
+
+# Contract B outputs — tracked so Aditya can pull them directly
+# scene/sparse/0/*.bin
+# scene/poses_bounds.npy
+# scene/metadata.json
+
+# Training output
+scratch/output/checkpoints/
+scratch/output/frames/*.ply
+scratch/output/frames/*.splat
+scratch/output/output_meta.json
+
+# Gap repair (post-MVP)
+scratch/gaps/gap_map.json
+scratch/gaps/gap_meta.json
+scratch/gaps/anchor_views/*.png
+scratch/gaps/repaired_views/*.png
+
+# Scratch / debug artifacts
+scratch/
+
+# Node
+node_modules/
+dist/
+
+# Environment
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# SSH / credentials
+.ssh/
+*.pem
+*.key
+
+# Large generated/downloaded dirs
+4DGaussians/
+viewer/public/frames/
+viewer/public/raw_videos/
+viewer/public/bullet-time/
+viewer/public/bullet-time-v2/
+viewer/public/bullet-time-v3/
+viewer/public/demo/
+viewer/public/test-gap/
+viewer/public/test-gap2/
+viewer/public/precomputed
+
+# Keep gitkeep files
+!.gitkeep
+.gstack/
+.vercel
